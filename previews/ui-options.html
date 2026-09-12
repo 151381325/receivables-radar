@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>回款雷达 · UI 方案对比</title>
+  <style>
+    :root { color-scheme: light; font-family: "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif; color: #1e293b; background: #eef2f7; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 36px 20px 64px; }
+    .intro { max-width: 1180px; margin: 0 auto 28px; }
+    .eyebrow { color: #64748b; font-size: 12px; font-weight: 800; letter-spacing: .12em; margin: 0 0 8px; text-transform: uppercase; }
+    h1 { font-size: clamp(26px, 4vw, 40px); margin: 0 0 10px; letter-spacing: -.04em; }
+    .intro p { margin: 0; color: #64748b; }
+    .options { max-width: 1180px; margin: auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; align-items: start; }
+    .option { min-width: 0; }
+    .option > h2 { margin: 0 0 5px; font-size: 18px; }
+    .option > p { margin: 0 0 12px; color: #64748b; font-size: 13px; line-height: 1.55; min-height: 42px; }
+    .screen { min-height: 630px; overflow: hidden; position: relative; }
+    .money { font-variant-numeric: tabular-nums; }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .tag { display: inline-flex; align-items: center; border-radius: 999px; padding: 5px 9px; font-size: 11px; font-weight: 750; white-space: nowrap; }
+    .card { padding: 15px; }
+    .small { color: inherit; font-size: 12px; opacity: .66; }
+    .item { display: block; margin-top: 10px; }
+    .item strong { display: block; margin: 5px 0 3px; font-size: 17px; }
+    .item p { margin: 0; font-size: 12px; line-height: 1.55; opacity: .72; }
+    .action { display: inline-flex; align-items: center; justify-content: center; min-height: 39px; padding: 0 13px; border: 0; border-radius: 11px; font: inherit; font-weight: 750; }
+    /* A: calm, financial and focused */
+    .calm { background: #f8fafc; border: 1px solid #dbe4ee; border-radius: 20px; padding: 20px; }
+    .calm .brand { font-weight: 850; color: #14213d; letter-spacing: -.04em; }
+    .calm .plus { background: #1d4ed8; color: white; }
+    .calm .hello { margin: 38px 0 20px; }
+    .calm .hello h3 { margin: 0; font-size: 26px; letter-spacing: -.05em; }
+    .calm .hello p { margin: 7px 0; color: #64748b; font-size: 13px; }
+    .calm .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+    .calm .metric { background: white; border: 1px solid #e3eaf2; border-radius: 13px; padding: 12px; }
+    .calm .metric span { color: #64748b; font-size: 11px; display: block; }
+    .calm .metric b { display: block; margin-top: 5px; font-size: 17px; letter-spacing: -.03em; }
+    .calm .section { margin-top: 24px; }
+    .calm .section h4 { margin: 0; font-size: 15px; }
+    .calm .calm-card { background: white; border: 1px solid #e3eaf2; border-left: 4px solid #f97316; border-radius: 13px; margin-top: 10px; padding: 14px; }
+    .calm .tag { color: #b45309; background: #fff7ed; }
+    .calm .bottom { display: flex; position: absolute; inset: auto 15px 15px; padding: 10px; border: 1px solid #e3eaf2; border-radius: 14px; background: #fff; justify-content: space-around; color: #64748b; font-size: 11px; }
+    .calm .bottom b { color: #1d4ed8; }
+    /* B: warm, human and encouraging */
+    .warm { border-radius: 28px; background: #fff9f2; padding: 22px; color: #422006; }
+    .warm .brand { font-weight: 900; font-size: 19px; letter-spacing: -.05em; }
+    .warm .brand i { display: inline-grid; place-items: center; width: 25px; height: 25px; margin-right: 6px; border-radius: 8px; background: #fb923c; color: white; font-style: normal; }
+    .warm .plus { background: #422006; color: white; border-radius: 999px; }
+    .warm .hero { margin: 28px 0 17px; padding: 20px; border-radius: 19px; color: white; background: linear-gradient(130deg, #c2410c, #f97316); }
+    .warm .hero p { margin: 0 0 8px; opacity: .78; font-size: 12px; }
+    .warm .hero h3 { margin: 0; font-size: 23px; letter-spacing: -.05em; }
+    .warm .hero small { display: block; margin-top: 15px; opacity: .84; }
+    .warm .warm-card { background: #fff; border-radius: 17px; margin-top: 10px; padding: 15px; box-shadow: 0 7px 20px #7c2d1212; }
+    .warm .tag { color: #c2410c; background: #ffedd5; }
+    .warm .circle { width: 28px; height: 28px; border-radius: 50%; background: #ffedd5; display: grid; place-items: center; color: #c2410c; font-weight: 900; }
+    .warm .bottom { position: absolute; inset: auto 18px 18px; display: flex; justify-content: space-around; padding: 12px; border-radius: 17px; background: #422006; color: #fed7aa; font-size: 11px; }
+    .warm .bottom b { color: white; }
+    /* C: dark dashboard, data-forward */
+    .dark { background: #0f172a; color: #e2e8f0; border-radius: 20px; padding: 20px; }
+    .dark .brand { color: white; font-weight: 850; letter-spacing: -.04em; }
+    .dark .status { color: #86efac; background: #14532d; padding: 5px 8px; border-radius: 99px; font-size: 10px; font-weight: 800; }
+    .dark .overview { margin: 31px 0 19px; }
+    .dark .overview span { color: #94a3b8; font-size: 12px; }
+    .dark .overview b { display: block; font-size: 32px; color: white; margin: 4px 0; letter-spacing: -.06em; }
+    .dark .overview small { color: #fb7185; }
+    .dark .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .dark .metric { padding: 10px; background: #1e293b; border-radius: 10px; }
+    .dark .metric span { display: block; color: #94a3b8; font-size: 10px; }
+    .dark .metric b { display: block; color: white; margin-top: 5px; font-size: 13px; }
+    .dark h4 { margin: 24px 0 8px; color: #f8fafc; font-size: 14px; }
+    .dark-card { padding: 14px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; margin-top: 9px; }
+    .dark .tag { color: #fbbf24; background: #78350f; }
+    .dark .action { margin-top: 12px; width: 100%; background: #22c55e; color: #052e16; }
+    .dark .bottom { position: absolute; inset: auto 15px 15px; background: #1e293b; border: 1px solid #334155; display: flex; justify-content: space-around; padding: 10px; border-radius: 11px; color: #94a3b8; font-size: 11px; }
+    .dark .bottom b { color: #22c55e; }
+    @media (max-width: 840px) { body { padding: 24px 15px 42px; } .options { grid-template-columns: 1fr; max-width: 440px; } .screen { min-height: 560px; } .option { margin-bottom: 18px; } .option > p { min-height: 0; } }
+  </style>
+</head>
+<body>
+  <header class="intro"><p class="eyebrow">回款雷达 · 视觉方向</p><h1>选一个你每天愿意打开的界面</h1><p>这三版都将自动适配手机和电脑；这里只比较视觉表达和信息层级，最终不会让用户手动切换模式。</p></header>
+  <main class="options">
+    <section class="option"><h2>方案 A · 冷静专业</h2><p>财务感清晰、信息规整，适合长期管理多笔应收。</p><div class="screen calm"><div class="row"><span class="brand">回款雷达</span><button class="action plus">＋ 新建</button></div><div class="hello"><h3>今天，先处理这些款</h3><p>9 月 12 日 · 星期六</p></div><div class="metrics"><div class="metric"><span>待收总额</span><b class="money">¥28,600</b></div><div class="metric"><span>逾期金额</span><b class="money" style="color:#ea580c">¥12,000</b></div><div class="metric"><span>今日行动</span><b>2 笔</b></div><div class="metric"><span>7 天内到期</span><b class="money">¥9,800</b></div></div><div class="section"><div class="row"><h4>行动清单</h4><span class="small">2 笔</span></div><article class="calm-card item"><div class="row"><span class="small">星桥咨询 · 年度顾问</span><span class="tag">已逾期 8 天</span></div><strong class="money">¥12,000.00</strong><p>上次沟通：财务正在审批 · 今天跟进</p></article><article class="calm-card item" style="border-left-color:#3b82f6"><div class="row"><span class="small">青禾文化 · 小程序尾款</span><span class="tag" style="color:#1d4ed8;background:#eff6ff">明天跟进</span></div><strong class="money">¥5,800.00</strong></article></div><nav class="bottom"><b>⌁<br>今日</b><span>▦<br>全部应收</span><span>＋<br>新建</span></nav></div></section>
+    <section class="option"><h2>方案 B · 温暖陪伴</h2><p>用更少的财务术语表达行动，减少催款的心理负担。</p><div class="screen warm"><div class="row"><span class="brand"><i>¥</i>回款雷达</span><button class="action plus">记录一笔</button></div><div class="hero"><p>今天的回款进度</p><h3>还有 2 笔需要你处理</h3><small>先联系星桥咨询，能推进 ¥12,000 的回款。</small></div><div class="row"><h4 style="margin:0">现在就做</h4><span class="small">按优先级排好</span></div><article class="warm-card item"><div class="row"><div class="circle">1</div><span class="tag">逾期 8 天</span></div><strong>跟进星桥咨询</strong><p>年度顾问服务 · 剩余 ¥12,000.00</p><button class="action" style="margin-top:13px;background:#ffedd5;color:#9a3412">生成催款文案 →</button></article><article class="warm-card item"><div class="row"><div class="circle">2</div><span class="tag" style="color:#475569;background:#f1f5f9">明天到期</span></div><strong>确认青禾文化付款安排</strong><p>小程序开发尾款 · 剩余 ¥5,800.00</p></article><nav class="bottom"><b>今日待办</b><span>全部应收</span><span>＋ 新建</span></nav></div></section>
+    <section class="option"><h2>方案 C · 深色掌控</h2><p>数据密度最高、状态最醒目，偏向高频管理和强提醒。</p><div class="screen dark"><div class="row"><span class="brand">回款雷达</span><span class="status">● 数据已保存</span></div><div class="overview"><span>当前待收</span><b class="money">¥28,600</b><small>↑ 其中 ¥12,000 已逾期</small></div><div class="metrics"><div class="metric"><span>今日</span><b>2 项行动</b></div><div class="metric"><span>本周</span><b>¥9,800 到期</b></div><div class="metric"><span>已收</span><b>¥4,000</b></div></div><h4>优先处理</h4><article class="dark-card item"><div class="row"><span class="small">星桥咨询 / 年度顾问</span><span class="tag">D+8</span></div><strong class="money">¥12,000.00</strong><p>承诺付款日已过 · 建议立即跟进</p><button class="action">立即生成文案</button></article><article class="dark-card item"><div class="row"><span class="small">青禾文化 / 小程序尾款</span><span class="tag" style="color:#93c5fd;background:#1e3a8a">明日</span></div><strong class="money">¥5,800.00</strong><p>已部分到账 · 下次跟进已排期</p></article><nav class="bottom"><b>● 今日</b><span>▦ 台账</span><span>＋ 记录</span></nav></div></section>
+  </main>
+</body>
+</html>

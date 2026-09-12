@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="回款雷达：面向自由职业者的小型应收款跟进工具">
+  <title>回款雷达</title>
+  <link rel="stylesheet" href="./src/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <button class="brand" type="button" data-view="today" aria-label="返回今日页面">
+        <span class="brand-mark" aria-hidden="true"><span></span></span>
+        <span><strong>回款雷达</strong><small>把该收的钱，稳稳收回来</small></span>
+      </button>
+      <button class="button primary header-action" type="button" data-new-record>＋ 新建应收</button>
+    </header>
+
+    <div class="workspace">
+      <aside class="side-nav" aria-label="主导航">
+        <div class="nav-group">
+          <p class="nav-label">工作台</p>
+          <button class="nav-item is-active" type="button" data-view="today"><span aria-hidden="true">⌁</span>今日行动</button>
+          <button class="nav-item" type="button" data-view="all"><span aria-hidden="true">▦</span>全部应收</button>
+          <button class="nav-item" type="button" data-new-record><span aria-hidden="true">＋</span>新建应收</button>
+        </div>
+        <div class="privacy-note">
+          <span class="privacy-icon" aria-hidden="true">⌾</span>
+          <div><strong>数据留在本机</strong><p>没有账号，也不会上传云端</p></div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <section class="view" id="view-today" data-view-panel="today">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow" id="today-date"></p>
+              <h1>今天，先处理这些款</h1>
+              <p>按紧急程度排好了，处理一笔就轻松一点。</p>
+            </div>
+            <button class="button primary desktop-only" type="button" data-new-record>＋ 新建应收</button>
+          </div>
+
+          <div class="metrics" aria-label="回款概览">
+            <article class="metric-card emphasis"><span>待收总额</span><strong id="metric-outstanding">¥0.00</strong><small>包含暂停跟进</small></article>
+            <article class="metric-card danger"><span>已逾期金额</span><strong id="metric-overdue">¥0.00</strong><small>需要优先</small></article>
+            <article class="metric-card"><span>今日要跟进</span><strong id="metric-actions">0 笔</strong><small>今天只处理最关键的几笔</small></article>
+            <article class="metric-card"><span>7 天内到期</span><strong id="metric-upcoming">¥0.00</strong><small>提前安排更从容</small></article>
+          </div>
+
+          <div class="content-grid">
+            <section class="panel action-panel">
+              <div class="panel-heading">
+                <div><span class="pulse-dot"></span><h2>行动清单</h2></div>
+                <span class="count-badge" id="queue-count">0 笔</span>
+              </div>
+              <div class="record-list" id="today-list"></div>
+            </section>
+
+            <aside class="right-column">
+              <section class="panel focus-card">
+                <p class="eyebrow">今天的回款进度</p>
+                <h2>先完成最关键的 1—3 笔</h2>
+                <p>不用一次清空所有事项。处理一笔，就离回款更近一步。</p>
+                <button class="text-button" type="button" data-view="all">查看全部应收 <span>→</span></button>
+              </section>
+              <section class="panel data-card">
+                <div><span class="data-icon" aria-hidden="true">⇩</span><div><strong>备份本地数据</strong><p>建议每周导出一次 JSON</p></div></div>
+                <button class="button quiet" type="button" id="export-backup">导出备份</button>
+                <button class="text-button small" type="button" id="import-backup">恢复备份</button>
+                <input type="file" id="backup-file" accept="application/json,.json" hidden>
+              </section>
+            </aside>
+          </div>
+        </section>
+
+        <section class="view" id="view-all" data-view-panel="all" hidden>
+          <div class="page-heading">
+            <div><p class="eyebrow">应收台账</p><h1>全部应收</h1><p>每一笔金额、状态和时间线，都在这里。</p></div>
+            <button class="button primary desktop-only" type="button" data-new-record>＋ 新建应收</button>
+          </div>
+          <section class="panel ledger-panel">
+            <div class="filter-row" role="group" aria-label="按状态筛选">
+              <button class="filter-chip is-active" type="button" data-filter="all">全部</button>
+              <button class="filter-chip" type="button" data-filter="unbilled">待开票</button>
+              <button class="filter-chip" type="button" data-filter="awaiting">待付款</button>
+              <button class="filter-chip" type="button" data-filter="partial">部分到账</button>
+              <button class="filter-chip" type="button" data-filter="paid">已收款</button>
+              <button class="filter-chip" type="button" data-filter="paused">暂停</button>
+            </div>
+            <div class="record-list ledger-list" id="all-list"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-form" data-view-panel="form" hidden>
+          <div class="page-heading compact">
+            <div><button class="back-link" type="button" data-view="today">← 返回</button><h1 id="form-title">新建应收</h1><p>只填关键内容，30 秒完成记录。</p></div>
+          </div>
+          <form class="panel receivable-form" id="receivable-form" novalidate>
+            <input type="hidden" id="record-id" name="recordId">
+            <div class="form-section">
+              <div class="section-number">01</div>
+              <div class="form-section-content">
+                <h2>这笔钱来自哪里？</h2>
+                <div class="field-grid">
+                  <label class="field"><span>客户名称 *</span><input id="client-name" name="clientName" maxlength="50" required placeholder="例如：青禾设计"></label>
+                  <label class="field"><span>项目名称 *</span><input id="project-name" name="projectName" maxlength="100" required placeholder="例如：品牌官网设计"></label>
+                </div>
+              </div>
+            </div>
+            <div class="form-section">
+              <div class="section-number">02</div>
+              <div class="form-section-content">
+                <h2>金额和时间</h2>
+                <div class="field-grid three">
+                  <label class="field"><span>应收总额（元）*</span><input id="total-amount" name="totalAmount" type="number" min="0.01" step="0.01" required placeholder="5000.00"></label>
+                  <label class="field"><span>付款截止日 *</span><input id="due-date" name="dueDate" type="date" required></label>
+                  <label class="field"><span>下次跟进日</span><input id="next-follow-up" name="nextFollowUpDate" type="date"></label>
+                </div>
+                <label class="check-field"><input id="invoice-sent" name="invoiceSent" type="checkbox"><span><strong>已发送发票或付款通知</strong><small>未勾选时，这笔应收会显示为“待开票”</small></span></label>
+              </div>
+            </div>
+            <div class="form-section">
+              <div class="section-number">03</div>
+              <div class="form-section-content">
+                <h2>补充说明</h2>
+                <label class="field"><span>备注</span><textarea id="notes" name="notes" maxlength="500" rows="4" placeholder="例如：尾款 50%，需要对方财务确认"></textarea></label>
+                <label class="check-field pause-field" id="pause-field" hidden><input id="paused" name="paused" type="checkbox"><span><strong>暂停跟进</strong><small>暂停后仍计入待收总额，但不会出现在今日行动中</small></span></label>
+              </div>
+            </div>
+            <div class="form-actions"><button class="button quiet" type="button" data-view="today">取消</button><button class="button primary" type="submit">保存应收</button></div>
+            <p class="form-error" id="form-error" role="alert"></p>
+          </form>
+        </section>
+      </main>
+    </div>
+
+    <nav class="mobile-nav" aria-label="移动端导航">
+      <button class="is-active" type="button" data-view="today"><span>⌁</span>今日</button>
+      <button type="button" data-view="all"><span>▦</span>全部</button>
+      <button class="mobile-add" type="button" data-new-record><span>＋</span>新建</button>
+    </nav>
+  </div>
+
+  <dialog class="modal" id="record-dialog">
+    <div class="modal-head"><div><p class="eyebrow">应收详情</p><h2 id="detail-title"></h2></div><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div>
+    <div id="detail-content"></div>
+    <div class="modal-actions wrap">
+      <button class="button primary" type="button" id="detail-follow-up">记录跟进</button>
+      <button class="button secondary" type="button" id="detail-payment">登记到账</button>
+      <button class="button quiet" type="button" id="detail-reminder">催款文案</button>
+      <button class="button quiet" type="button" id="detail-edit">编辑</button>
+      <button class="text-button danger-text" type="button" id="detail-delete">删除</button>
+    </div>
+  </dialog>
+
+  <dialog class="modal small-modal" id="payment-dialog">
+    <div class="modal-head"><div><p class="eyebrow">更新回款</p><h2>登记到账</h2></div><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div>
+    <form id="payment-form">
+      <label class="field"><span>本次到账金额（元）*</span><input id="payment-amount" type="number" min="0.01" step="0.01" required></label>
+      <div class="field-grid"><label class="field"><span>到账日期 *</span><input id="payment-date" type="date" required></label><label class="field"><span>收款方式 *</span><select id="payment-method"><option>银行转账</option><option>微信</option><option>支付宝</option><option>现金</option><option>其他</option></select></label></div>
+      <label class="field"><span>备注</span><input id="payment-notes" maxlength="200" placeholder="例如：第一笔阶段款"></label>
+      <p class="form-error" id="payment-error" role="alert"></p>
+      <div class="modal-actions"><button class="button quiet" type="button" data-close-dialog>取消</button><button class="button primary" type="submit">确认到账</button></div>
+    </form>
+  </dialog>
+
+  <dialog class="modal small-modal" id="follow-dialog">
+    <div class="modal-head"><div><p class="eyebrow">留下沟通记录</p><h2>记录跟进</h2></div><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div>
+    <form id="follow-form">
+      <label class="field"><span>跟进日期 *</span><input id="follow-date" type="date" required></label>
+      <label class="field"><span>跟进结果 *</span><textarea id="follow-result" maxlength="300" rows="3" required placeholder="例如：已联系客户，对方财务正在审批"></textarea></label>
+      <div class="field-grid"><label class="field"><span>客户承诺付款日</span><input id="promise-date" type="date"></label><label class="field"><span>下次跟进日</span><input id="follow-next-date" type="date"></label></div>
+      <p class="form-error" id="follow-error" role="alert"></p>
+      <div class="modal-actions"><button class="button quiet" type="button" data-close-dialog>取消</button><button class="button primary" type="submit">保存记录</button></div>
+    </form>
+  </dialog>
+
+  <dialog class="modal small-modal" id="reminder-dialog">
+    <div class="modal-head"><div><p class="eyebrow">复制后自行发送</p><h2>催款文案</h2></div><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div>
+    <label class="field"><span id="reminder-stage">建议文案</span><textarea id="reminder-text" rows="8"></textarea></label>
+    <div class="calendar-actions"><button class="text-button" type="button" id="export-follow-calendar">导出跟进提醒</button><button class="text-button" type="button" id="export-due-calendar">导出到期提醒</button></div>
+    <div class="modal-actions"><button class="button quiet" type="button" data-close-dialog>关闭</button><button class="button primary" type="button" id="copy-reminder">复制文案</button></div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
