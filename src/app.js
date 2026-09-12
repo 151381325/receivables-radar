@@ -9,7 +9,14 @@ import {
   getTodayQueue,
   updateReceivable,
 } from './domain.js';
-import { buildRecordCardHTML, escapeHtml, filterRecords, formatMoney, statusLabel } from './presentation.js';
+import {
+  buildPrivacyNoticeHTML,
+  buildRecordCardHTML,
+  escapeHtml,
+  filterRecords,
+  formatMoney,
+  statusLabel,
+} from './presentation.js';
 import { DEFAULT_STORAGE_KEY, createRepository } from './storage.js';
 import { buildReminderMessage } from './templates.js';
 
@@ -220,6 +227,11 @@ document.addEventListener('click', (event) => {
   if (viewButton) showView(viewButton.dataset.view);
 
   if (event.target.closest('[data-new-record]')) openForm();
+
+  if (event.target.closest('[data-open-privacy]')) {
+    document.querySelector('#privacy-content').innerHTML = buildPrivacyNoticeHTML();
+    document.querySelector('#privacy-dialog').showModal();
+  }
 
   const recordButton = event.target.closest('[data-open-record]');
   if (recordButton) openDetail(recordButton.dataset.openRecord);

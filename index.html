@@ -27,7 +27,7 @@
         </div>
         <div class="privacy-note">
           <span class="privacy-icon" aria-hidden="true">⌾</span>
-          <div><strong>数据留在本机</strong><p>没有账号，也不会上传云端</p></div>
+          <div><strong>数据留在本机</strong><p>没有账号，也不会上传云端</p><button class="privacy-link" type="button" data-open-privacy>隐私与数据说明</button></div>
         </div>
       </aside>
 
@@ -69,6 +69,7 @@
                 <div><span class="data-icon" aria-hidden="true">⇩</span><div><strong>备份本地数据</strong><p>建议每周导出一次 JSON</p></div></div>
                 <button class="button quiet" type="button" id="export-backup">导出备份</button>
                 <button class="text-button small" type="button" id="import-backup">恢复备份</button>
+                <button class="privacy-link data-privacy-link" type="button" data-open-privacy>查看隐私与数据说明</button>
                 <input type="file" id="backup-file" accept="application/json,.json" hidden>
               </section>
             </aside>
@@ -182,6 +183,12 @@
     <label class="field"><span id="reminder-stage">建议文案</span><textarea id="reminder-text" rows="8"></textarea></label>
     <div class="calendar-actions"><button class="text-button" type="button" id="export-follow-calendar">导出跟进提醒</button><button class="text-button" type="button" id="export-due-calendar">导出到期提醒</button></div>
     <div class="modal-actions"><button class="button quiet" type="button" data-close-dialog>关闭</button><button class="button primary" type="button" id="copy-reminder">复制文案</button></div>
+  </dialog>
+
+  <dialog class="modal small-modal" id="privacy-dialog">
+    <div class="modal-head"><div><p class="eyebrow">使用前请了解</p><h2>隐私与数据说明</h2></div><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div>
+    <div class="privacy-content" id="privacy-content"></div>
+    <div class="modal-actions"><button class="button primary" type="button" data-close-dialog>我知道了</button></div>
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>

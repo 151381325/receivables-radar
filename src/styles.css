@@ -48,6 +48,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .privacy-icon { color: var(--primary); font-size: 20px; }
 .privacy-note strong { font-size: 12px; }
 .privacy-note p { font-size: 11px; color: var(--muted); line-height: 1.5; margin: 3px 0 0; }
+.privacy-link { border: 0; background: none; color: var(--primary); font-size: 12px; font-weight: 750; padding: 8px 0 0; cursor: pointer; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
 
 .main-content { width: 100%; max-width: 1320px; margin: 0 auto; padding: 42px 44px 80px; }
 .view { animation: reveal .26s ease; }
@@ -98,6 +99,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .data-card p { margin: 3px 0 0; color: var(--muted); font-size: 11px; }
 .data-icon { width: 38px; height: 38px; border-radius: 11px; background: var(--primary-soft); color: var(--primary); display: grid; place-items: center; font-size: 19px; }
 .data-card .button { width: 100%; }
+.data-privacy-link { display: block; margin: 4px auto 0; text-align: center; }
 
 .record-list { display: grid; }
 .receivable-card { border-bottom: 1px solid #edf1ef; position: relative; }
@@ -166,6 +168,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .timeline-list { display: grid; gap: 8px; }
 .timeline-item p { margin: 0; font-size: 12px; line-height: 1.55; }
 .calendar-actions { padding: 0 26px 16px; display: flex; gap: 20px; }
+.privacy-content { padding: 8px 26px 22px; }
+.privacy-section { padding: 17px 0; border-bottom: 1px solid var(--line); }
+.privacy-section:last-child { border-bottom: 0; padding-bottom: 0; }
+.privacy-section h3 { margin: 0 0 7px; font-size: 16px; }
+.privacy-section p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.75; }
 
 .toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); background: #183b36; color: white; border-radius: 10px; padding: 11px 16px; font-size: 13px; opacity: 0; pointer-events: none; transition: .2s ease; z-index: 100; box-shadow: var(--shadow); }
 .toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
@@ -218,6 +225,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .modal-actions.wrap .button { flex: 1 1 42%; }
   .danger-text { flex-basis: 100%; margin-left: 0; }
   .calendar-actions { padding: 0 18px 14px; flex-wrap: wrap; gap: 6px 18px; }
+  .privacy-content { padding: 6px 18px 18px; }
+  .privacy-section h3 { font-size: 17px; }
+  .privacy-section p { font-size: 15px; }
   .toast { bottom: 82px; max-width: calc(100vw - 30px); text-align: center; }
 }
 
