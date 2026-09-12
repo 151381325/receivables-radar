@@ -1,3 +1,38 @@
+# Generated build output
 dist/
+
+# Installed dependencies
 node_modules/
+
+# Deployment archives
 *.tgz
+*.tar.gz
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Test coverage and caches
+coverage/
+.cache/
+.npm/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.code-workspace
+.DS_Store
+Thumbs.db
+Desktop.ini
