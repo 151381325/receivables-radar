@@ -4,8 +4,9 @@ import rateLimit from '@fastify/rate-limit';
 
 import { createSessionService } from './auth/session-service.js';
 import { createAuthenticate } from './plugins/authenticate.js';
+import { registerAuthRoutes } from './routes/auth.js';
 
-export async function buildApp({ config, pool, clock = () => new Date() }) {
+export async function buildApp({ config, pool, mailer = null, clock = () => new Date() }) {
   const app = Fastify({ logger: config.nodeEnv !== 'test' });
   const sessions = createSessionService(pool, config);
   const authenticate = createAuthenticate(sessions, clock);
@@ -27,7 +28,16 @@ export async function buildApp({ config, pool, clock = () => new Date() }) {
     return reply.code(204).send();
   });
 
+  if (mailer) {
+    await registerAuthRoutes(app, { config, pool, mailer, clock });
+  }
+
   app.setErrorHandler((error, request, reply) => {
+    if (error.statusCode === 429) {
+      return reply.code(429).send({
+        error: { code: 'RATE_LIMITED', message: '操作过于频繁，请稍后重试' },
+      });
+    }
     request.log.error({ err: error, requestId: request.id }, 'request failed');
     return reply.code(500).send({
       error: { code: 'INTERNAL_ERROR', message: '服务暂时不可用，请稍后重试' },
