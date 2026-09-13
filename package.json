@@ -5,6 +5,17 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "db:migrate": "node server/db/migrate.js",
+    "dev:api": "node --watch server/main.js",
+    "start:api": "node server/main.js",
     "test": "node --test"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/rate-limit": "^11.2.0",
+    "argon2": "^0.45.1",
+    "fastify": "^5.12.4",
+    "nodemailer": "^10.0.9",
+    "pg": "^8.23.0"
   }
 }

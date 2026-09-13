@@ -417,6 +417,5 @@ document.querySelectorAll('dialog').forEach((dialog) => {
   });
 });
 
-seedExamples();
 render();
 showView('today');

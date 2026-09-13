@@ -12,6 +12,12 @@ node_modules/
 .env
 .env.*
 !.env.example
+server-data/
+backups/
+secrets/
+*.dump
+*.enc
+*.sql.gz
 *.local
 *.pem
 *.key
@@ -32,6 +38,7 @@ yarn-error.log*
 # Editors and operating systems
 .idea/
 .vscode/
+.worktrees/
 *.code-workspace
 .DS_Store
 Thumbs.db
