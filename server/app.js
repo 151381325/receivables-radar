@@ -5,6 +5,7 @@ import rateLimit from '@fastify/rate-limit';
 import { createSessionService } from './auth/session-service.js';
 import { createAuthenticate } from './plugins/authenticate.js';
 import { registerAuthRoutes } from './routes/auth.js';
+import { registerReceivableRoutes } from './routes/receivables.js';
 
 export async function buildApp({ config, pool, mailer = null, clock = () => new Date() }) {
   const app = Fastify({ logger: config.nodeEnv !== 'test' });
@@ -20,6 +21,8 @@ export async function buildApp({ config, pool, mailer = null, clock = () => new 
   app.get('/api/auth/me', { preHandler: authenticate }, async (request) => ({
     user: request.user,
   }));
+
+  await registerReceivableRoutes(app, { pool, authenticate });
 
   app.post('/api/auth/logout', async (request, reply) => {
     const token = request.cookies[sessions.cookieName];

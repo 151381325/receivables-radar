@@ -35,6 +35,8 @@ export function createApiClient(fetchImpl = globalThis.fetch) {
   }
 
   const post = (path, input) => request(path, { method: 'POST', body: JSON.stringify(input ?? {}) });
+  const put = (path, input) => request(path, { method: 'PUT', body: JSON.stringify(input ?? {}) });
+  const remove = (path, input) => request(path, { method: 'DELETE', body: JSON.stringify(input ?? {}) });
   return {
     request,
     getCurrentUser: () => request('/api/auth/me'),
@@ -44,5 +46,12 @@ export function createApiClient(fetchImpl = globalThis.fetch) {
     logout: () => post('/api/auth/logout'),
     requestPasswordReset: (email) => post('/api/auth/request-password-reset', { email }),
     resetPassword: (input) => post('/api/auth/reset-password', input),
+    listReceivables: async () => (await request('/api/receivables')).records,
+    createReceivable: (input) => post('/api/receivables', input).then((body) => body.record),
+    updateReceivable: (id, input) => put(`/api/receivables/${id}`, input).then((body) => body.record),
+    addPayment: (id, input) => post(`/api/receivables/${id}/payments`, input).then((body) => body.record),
+    addFollowUp: (id, input) => post(`/api/receivables/${id}/follow-ups`, input).then((body) => body.record),
+    deleteReceivable: (id, version) => remove(`/api/receivables/${id}`, { version }),
+    importReceivables: (records) => post('/api/receivables/import', { records }),
   };
 }

@@ -34,3 +34,16 @@ test('网络异常转换为可理解且可重试的错误', async () => {
     error.code === 'NETWORK_ERROR' && error.message.includes('网络')
   ));
 });
+
+test('删除应收使用版本号避免覆盖其他设备的数据', async () => {
+  const calls = [];
+  const api = createApiClient(async (url, options) => {
+    calls.push({ url, options });
+    return new Response(null, { status: 204 });
+  });
+
+  await api.deleteReceivable('rec-1', 3);
+  assert.equal(calls[0].url, '/api/receivables/rec-1');
+  assert.equal(calls[0].options.method, 'DELETE');
+  assert.equal(calls[0].options.body, JSON.stringify({ version: 3 }));
+});

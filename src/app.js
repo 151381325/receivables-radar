@@ -1,14 +1,6 @@
 import { parseBackup, serializeBackup } from './backup.js';
 import { buildCalendarEvent } from './calendar.js';
-import {
-  addFollowUp,
-  addPayment,
-  calculateDashboard,
-  createReceivable,
-  deriveReceivable,
-  getTodayQueue,
-  updateReceivable,
-} from './domain.js';
+import { calculateDashboard, deriveReceivable, getTodayQueue } from './domain.js';
 import {
   buildPrivacyNoticeHTML,
   buildRecordCardHTML,
@@ -17,10 +9,9 @@ import {
   formatMoney,
   statusLabel,
 } from './presentation.js';
-import { DEFAULT_STORAGE_KEY, createRepository } from './storage.js';
 import { buildReminderMessage } from './templates.js';
 
-const repository = createRepository(window.localStorage);
+let repository;
 const viewPanels = [...document.querySelectorAll('[data-view-panel]')];
 const state = { currentView: 'today', currentFilter: 'all', activeId: null };
 let toastTimer;
@@ -38,55 +29,45 @@ function shiftDate(dateText, days) {
   return localDate(date);
 }
 
-function seedExamples() {
-  if (window.localStorage.getItem(DEFAULT_STORAGE_KEY) !== null) return;
-  const today = localDate();
-  const now = new Date().toISOString();
-  const unbilled = createReceivable({
-    clientName: '远山工作室',
-    projectName: '品牌视觉设计',
-    totalAmount: 6800,
-    invoiceSent: false,
-    dueDate: shiftDate(today, 7),
-    notes: '示例数据，可在详情中删除。',
-  }, now);
-  const overdue = addFollowUp(createReceivable({
-    clientName: '星桥咨询',
-    projectName: '年度顾问服务',
-    totalAmount: 12000,
-    invoiceSent: true,
-    dueDate: shiftDate(today, -8),
-    nextFollowUpDate: today,
-    notes: '示例数据，可在详情中删除。',
-  }, now), {
-    followedAt: shiftDate(today, -4),
-    result: '对方财务正在审批，约定本周确认。',
-    promiseDate: shiftDate(today, -1),
-    nextFollowUpDate: today,
-  }, now);
-  const partial = addPayment(createReceivable({
-    clientName: '青禾文化',
-    projectName: '小程序开发尾款',
-    totalAmount: 9800,
-    invoiceSent: true,
-    dueDate: shiftDate(today, 2),
-    nextFollowUpDate: shiftDate(today, 1),
-    notes: '示例数据，可在详情中删除。',
-  }, now), {
-    amount: 4000,
-    paidAt: shiftDate(today, -2),
-    method: '银行转账',
-    notes: '首笔到账',
-  }, now);
-  repository.replaceAll([unbilled, overdue, partial]);
-}
-
 function showToast(message) {
   const toast = document.querySelector('#toast');
   toast.textContent = message;
   toast.classList.add('is-visible');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2600);
+}
+
+function setSyncStatus(message, canRetry = false) {
+  const status = document.querySelector('#sync-status');
+  status.textContent = message;
+  document.querySelector('[data-retry-sync]').hidden = !canRetry;
+}
+
+async function refreshRecords({ silent = false } = {}) {
+  if (!repository) return;
+  setSyncStatus('正在同步数据…');
+  try {
+    await repository.load();
+    render();
+    setSyncStatus(`数据已同步 · ${new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date())}`);
+    if (!silent) showToast('已刷新云端数据');
+  } catch (error) {
+    setSyncStatus('同步失败，可重试', true);
+    if (!silent) showToast(error.message);
+    throw error;
+  }
+}
+
+async function handleMutation(action) {
+  try {
+    return await action();
+  } catch (error) {
+    if (error.code === 'STALE_VERSION') {
+      await refreshRecords({ silent: true }).catch(() => {});
+      showToast('这笔记录已在其他设备更新，已刷新最新数据');
+    }
+    throw error;
+  }
 }
 
 function emptyState(message = '还没有符合条件的应收款') {
@@ -228,6 +209,10 @@ document.addEventListener('click', (event) => {
 
   if (event.target.closest('[data-new-record]')) openForm();
 
+  if (event.target.closest('[data-refresh-records], [data-retry-sync]')) {
+    refreshRecords().catch(() => {});
+  }
+
   if (event.target.closest('[data-open-privacy]')) {
     document.querySelector('#privacy-content').innerHTML = buildPrivacyNoticeHTML();
     document.querySelector('#privacy-dialog').showModal();
@@ -247,7 +232,7 @@ document.addEventListener('click', (event) => {
   }
 });
 
-document.querySelector('#receivable-form').addEventListener('submit', (event) => {
+document.querySelector('#receivable-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const id = document.querySelector('#record-id').value;
   const dueDate = document.querySelector('#due-date').value;
@@ -266,8 +251,9 @@ document.querySelector('#receivable-form').addEventListener('submit', (event) =>
 
   try {
     const existing = id ? repository.get(id) : null;
-    const record = existing ? updateReceivable(existing, input) : createReceivable(input);
-    repository.save(record);
+    await handleMutation(() => (existing
+      ? repository.update(existing.id, { ...input, version: existing.version })
+      : repository.create(input)));
     render();
     showView('today');
     showToast(existing ? '应收信息已更新' : '应收已创建');
@@ -282,13 +268,15 @@ document.querySelector('#detail-edit').addEventListener('click', () => {
   if (record) openForm(record);
 });
 
-document.querySelector('#detail-delete').addEventListener('click', () => {
+document.querySelector('#detail-delete').addEventListener('click', async () => {
   const record = activeRecord();
   if (!record || !window.confirm(`确认删除“${record.clientName} · ${record.projectName}”吗？此操作无法撤销。`)) return;
-  repository.remove(record.id);
-  closeDialogs();
-  render();
-  showToast('应收记录已删除');
+  try {
+    await handleMutation(() => repository.remove(record.id, record.version));
+    closeDialogs();
+    render();
+    showToast('应收记录已删除');
+  } catch (error) { showToast(error.message); }
 });
 
 document.querySelector('#detail-payment').addEventListener('click', () => {
@@ -304,12 +292,13 @@ document.querySelector('#detail-payment').addEventListener('click', () => {
   document.querySelector('#payment-dialog').showModal();
 });
 
-document.querySelector('#payment-form').addEventListener('submit', (event) => {
+document.querySelector('#payment-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const record = activeRecord();
   if (!record) return;
   try {
-    repository.save(addPayment(record, {
+    await handleMutation(() => repository.addPayment(record.id, {
+      version: record.version,
       amount: document.querySelector('#payment-amount').value,
       paidAt: document.querySelector('#payment-date').value,
       method: document.querySelector('#payment-method').value,
@@ -334,12 +323,13 @@ document.querySelector('#detail-follow-up').addEventListener('click', () => {
   document.querySelector('#follow-dialog').showModal();
 });
 
-document.querySelector('#follow-form').addEventListener('submit', (event) => {
+document.querySelector('#follow-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const record = activeRecord();
   if (!record) return;
   try {
-    repository.save(addFollowUp(record, {
+    await handleMutation(() => repository.addFollowUp(record.id, {
+      version: record.version,
       followedAt: document.querySelector('#follow-date').value,
       result: document.querySelector('#follow-result').value,
       promiseDate: document.querySelector('#promise-date').value || null,
@@ -400,8 +390,11 @@ document.querySelector('#backup-file').addEventListener('change', async (event) 
   const [file] = event.target.files;
   if (!file) return;
   try {
-    const result = parseBackup(await file.text(), repository.list());
-    repository.replaceAll(result.records);
+    const source = await file.text();
+    const parsed = parseBackup(source, []);
+    if (!window.confirm(`将导入 ${parsed.records.length} 笔本地记录到云端；同 ID 的云端记录会保留。导入前会下载原始备份，是否继续？`)) return;
+    downloadText(`回款雷达导入前备份-${localDate()}.json`, source, 'application/json;charset=utf-8');
+    const result = await handleMutation(() => repository.importRecords(parsed.records));
     render();
     showToast(`恢复完成：导入 ${result.importedCount} 笔，跳过 ${result.skippedCount} 笔`);
   } catch (error) {
@@ -417,5 +410,8 @@ document.querySelectorAll('dialog').forEach((dialog) => {
   });
 });
 
-render();
-showView('today');
+export async function startApp(cloudRepository) {
+  repository = cloudRepository;
+  showView('today');
+  await refreshRecords({ silent: true });
+}
