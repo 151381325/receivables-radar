@@ -12,6 +12,9 @@ node_modules/
 .env
 .env.*
 !.env.example
+server-data/
+backups/
+*.sql.gz
 *.local
 *.pem
 *.key
