@@ -14,6 +14,9 @@ node_modules/
 !.env.example
 server-data/
 backups/
+secrets/
+*.dump
+*.enc
 *.sql.gz
 *.local
 *.pem
