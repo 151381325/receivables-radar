@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const readProjectFile = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
+const readProjectFile = async (path) => (await readFile(new URL(`../${path}`, import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
 
 test('生产数据库不暴露主机端口且只有网关发布 HTTP 端口', async () => {
   const compose = await readProjectFile('compose.yaml');
@@ -56,4 +56,9 @@ test('Git 排除密钥目录和数据库备份产物', async () => {
   for (const entry of ['secrets/', '*.dump', '*.enc']) {
     assert.ok(gitignore.includes(entry), `缺少忽略规则：${entry}`);
   }
+});
+
+test('共享临时数据库的集成测试按单进程执行', async () => {
+  const packageJson = JSON.parse(await readProjectFile('package.json'));
+  assert.match(packageJson.scripts.test, /--test-concurrency=1/);
 });

@@ -1,4 +1,5 @@
 import { createApiClient } from './api-client.js';
+import { createCloudRepository } from './cloud-repository.js';
 
 const api = createApiClient();
 const authShell = document.querySelector('#auth-shell');
@@ -39,13 +40,14 @@ function setBusy(form, busy) {
 }
 
 async function enterApp(user) {
-  authShell.hidden = true;
-  appShell.hidden = false;
   document.querySelector('#account-email').textContent = user.email;
   if (!appLoaded) {
+    const { startApp } = await import('./app.js');
+    await startApp(createCloudRepository(api));
     appLoaded = true;
-    await import('./app.js');
   }
+  authShell.hidden = true;
+  appShell.hidden = false;
 }
 
 async function submit(form, action) {
