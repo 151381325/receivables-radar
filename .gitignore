@@ -32,6 +32,7 @@ yarn-error.log*
 # Editors and operating systems
 .idea/
 .vscode/
+.worktrees/
 *.code-workspace
 .DS_Store
 Thumbs.db
