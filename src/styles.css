@@ -24,6 +24,27 @@ button { color: inherit; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid rgba(194, 65, 12, .24); outline-offset: 2px; }
 [hidden] { display: none !important; }
 
+.auth-shell { min-height: 100vh; padding: 40px 20px; display: grid; place-items: center; align-content: center; gap: 24px; }
+.auth-brand { display: flex; align-items: center; gap: 12px; }
+.auth-brand strong, .auth-brand small { display: block; }
+.auth-brand strong { font-size: 23px; }
+.auth-brand small { color: var(--muted); margin-top: 3px; }
+.auth-card { width: min(480px, 100%); padding: 36px; background: rgba(255,253,249,.96); border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow); }
+.auth-card h1 { margin: 8px 0 10px; font-size: clamp(34px, 6vw, 46px); letter-spacing: -.04em; }
+.auth-lead { color: var(--muted); line-height: 1.7; margin: 0 0 25px; }
+.auth-form { display: grid; }
+.auth-submit { width: 100%; min-height: 52px; margin-top: 4px; }
+.auth-links { display: flex; justify-content: space-between; margin-top: 12px; }
+.auth-back { justify-self: center; margin-top: 10px; }
+.auth-terms { margin: 2px 0 18px; }
+.auth-error { margin: 12px 0 0; font-size: 14px; }
+.auth-status { text-align: center; justify-items: center; gap: 16px; }
+.auth-status p { color: var(--muted); line-height: 1.7; margin: 0; }
+.auth-status-icon { width: 60px; height: 60px; display: grid; place-items: center; border-radius: 20px; color: var(--primary); background: var(--primary-soft); font-size: 28px; }
+.auth-footnote { color: var(--muted); font-size: 13px; text-align: center; margin: 0; }
+.header-controls { display: flex; align-items: center; gap: 14px; }
+.account-email { color: var(--muted); font-size: 13px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .app-shell { min-height: 100vh; }
 .app-header { height: 76px; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(240, 223, 207, .9); background: rgba(255,253,249,.88); backdrop-filter: blur(14px); position: sticky; top: 0; z-index: 20; }
 .brand { border: 0; background: none; display: inline-flex; gap: 12px; align-items: center; text-align: left; padding: 6px; cursor: pointer; }
@@ -229,6 +250,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .privacy-section h3 { font-size: 17px; }
   .privacy-section p { font-size: 15px; }
   .toast { bottom: 82px; max-width: calc(100vw - 30px); text-align: center; }
+  .auth-shell { padding: 26px 15px; align-content: start; }
+  .auth-brand { margin-top: 18px; }
+  .auth-card { padding: 27px 20px; border-radius: 19px; }
+  .auth-card h1 { font-size: 38px; }
+  .account-email { display: none; }
+  .header-controls { gap: 8px; }
 }
 
 @media (max-width: 390px) {

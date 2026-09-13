@@ -8,13 +8,60 @@
   <link rel="stylesheet" href="./src/styles.css">
 </head>
 <body>
-  <div class="app-shell">
+  <section class="auth-shell" id="auth-shell" aria-labelledby="auth-title">
+    <div class="auth-brand">
+      <span class="brand-mark" aria-hidden="true"><span></span></span>
+      <span><strong>回款雷达</strong><small>把该收的钱，稳稳收回来</small></span>
+    </div>
+    <div class="auth-card">
+      <p class="eyebrow">个人自由职业者回款助手</p>
+      <h1 id="auth-title">欢迎回来</h1>
+      <p class="auth-lead" id="auth-lead">登录后，电脑和手机上的回款记录会保持一致。</p>
+
+      <form class="auth-form" id="login-form" data-auth-panel="login">
+        <label class="field"><span>邮箱</span><input name="email" type="email" autocomplete="email" maxlength="254" required placeholder="name@example.com"></label>
+        <label class="field"><span>密码</span><input name="password" type="password" autocomplete="current-password" minlength="10" maxlength="128" required placeholder="请输入密码"></label>
+        <button class="button primary auth-submit" type="submit">登录</button>
+        <div class="auth-links"><button type="button" class="text-button" data-auth-view="forgot">忘记密码</button><button type="button" class="text-button" data-auth-view="register">创建账号</button></div>
+      </form>
+
+      <form class="auth-form" id="register-form" data-auth-panel="register" hidden>
+        <label class="field"><span>邮箱</span><input name="email" type="email" autocomplete="email" maxlength="254" required placeholder="name@example.com"></label>
+        <label class="field"><span>设置密码</span><input name="password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required placeholder="至少10个字符"></label>
+        <label class="check-field auth-terms"><input name="acceptedTerms" type="checkbox" required><span><strong>我已阅读并同意用户协议与隐私政策</strong><small>我们只收集提供账号与回款记录同步所必需的数据。</small></span></label>
+        <button class="button primary auth-submit" type="submit">创建账号</button>
+        <button type="button" class="text-button auth-back" data-auth-view="login">已有账号，返回登录</button>
+      </form>
+
+      <form class="auth-form" id="forgot-form" data-auth-panel="forgot" hidden>
+        <label class="field"><span>注册邮箱</span><input name="email" type="email" autocomplete="email" maxlength="254" required placeholder="name@example.com"></label>
+        <button class="button primary auth-submit" type="submit">发送重置邮件</button>
+        <button type="button" class="text-button auth-back" data-auth-view="login">返回登录</button>
+      </form>
+
+      <form class="auth-form" id="reset-form" data-auth-panel="reset" hidden>
+        <label class="field"><span>新密码</span><input name="password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required placeholder="至少10个字符"></label>
+        <button class="button primary auth-submit" type="submit">保存新密码</button>
+      </form>
+
+      <div class="auth-form auth-status" data-auth-panel="status" hidden>
+        <div class="auth-status-icon" aria-hidden="true">✓</div>
+        <p id="auth-status-message"></p>
+        <button type="button" class="button primary" data-auth-view="login">返回登录</button>
+      </div>
+
+      <p class="form-error auth-error" id="auth-error" role="alert" aria-live="polite" tabindex="-1"></p>
+    </div>
+    <p class="auth-footnote">你的业务记录仅用于提供回款管理服务，不会自动发送给客户。</p>
+  </section>
+
+  <div class="app-shell" id="app-shell" hidden>
     <header class="app-header">
       <button class="brand" type="button" data-view="today" aria-label="返回今日页面">
         <span class="brand-mark" aria-hidden="true"><span></span></span>
         <span><strong>回款雷达</strong><small>把该收的钱，稳稳收回来</small></span>
       </button>
-      <button class="button primary header-action" type="button" data-new-record>＋ 新建应收</button>
+      <div class="header-controls"><span class="account-email" id="account-email"></span><button class="text-button" id="logout-button" type="button">退出</button><button class="button primary header-action" type="button" data-new-record>＋ 新建应收</button></div>
     </header>
 
     <div class="workspace">
@@ -27,7 +74,7 @@
         </div>
         <div class="privacy-note">
           <span class="privacy-icon" aria-hidden="true">⌾</span>
-          <div><strong>数据留在本机</strong><p>没有账号，也不会上传云端</p><button class="privacy-link" type="button" data-open-privacy>隐私与数据说明</button></div>
+          <div><strong>数据分级保护</strong><p>账号用于安全登录；当前应收记录仍保存在本机</p><button class="privacy-link" type="button" data-open-privacy>隐私与数据说明</button></div>
         </div>
       </aside>
 
@@ -192,6 +239,6 @@
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="./src/app.js"></script>
+  <script type="module" src="./src/auth-ui.js"></script>
 </body>
 </html>
