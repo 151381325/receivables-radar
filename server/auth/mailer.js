@@ -19,5 +19,16 @@ export function createMailer(smtpConfig, appOrigin) {
         text: `请在30分钟内打开以下链接完成邮箱验证：\n${url.href}`,
       });
     },
+
+    async sendPasswordReset({ email, token }) {
+      const url = new URL('/reset-password', appOrigin);
+      url.searchParams.set('token', token);
+      await transport.sendMail({
+        from: smtpConfig.from,
+        to: email,
+        subject: '重置你的回款雷达密码',
+        text: `请在30分钟内打开以下链接重置密码：\n${url.href}`,
+      });
+    },
   };
 }
