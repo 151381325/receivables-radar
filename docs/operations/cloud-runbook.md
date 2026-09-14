@@ -2,7 +2,7 @@
 
 ## 1. 适用范围与责任边界
 
-本手册用于 Ubuntu 24.04 LTS 云服务器上的单机 MVP：Caddy 对外提供 HTTPS，Fastify 提供账号 API，PostgreSQL 只在 Docker 私有网络内运行。当前应收记录仍保存在浏览器本地；云端只承载账号、会话、邮箱验证和密码重置。
+本手册用于 Ubuntu 24.04 LTS 云服务器上的单机 MVP：Caddy 对外提供 HTTPS，Fastify 提供账号和应收 API，PostgreSQL 只在 Docker 私有网络内运行。登录后的应收、到账和跟进记录以云端 PostgreSQL 为正式数据源。
 
 购买服务器、域名实名、ICP备案、公安备案、DNS 修改、防火墙放行、生产部署和应用商店发布均属于外部操作，执行前必须由项目负责人明确确认。生产密钥不得发到聊天、提交 Git 或写进镜像。
 
