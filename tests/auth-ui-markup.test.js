@@ -24,3 +24,16 @@ test('认证脚本覆盖验证链接、重置链接和登录后加载应用', as
     "import('./app.js')", 'getCurrentUser', 'logout',
   ]) assert.ok(source.includes(fragment), `缺少认证流程：${fragment}`);
 });
+
+test('认证提交在禁用输入框前保留表单数据', async () => {
+  const source = await readFile(new URL('../src/auth-ui.js', import.meta.url), 'utf8');
+  const submitSource = source.slice(
+    source.indexOf('async function submit('),
+    source.indexOf("document.addEventListener('click'"),
+  );
+  const captureIndex = submitSource.indexOf('new FormData(form)');
+  const disableIndex = submitSource.indexOf('setBusy(form, true)');
+
+  assert.ok(captureIndex >= 0, '提交时应读取表单数据');
+  assert.ok(captureIndex < disableIndex, '必须在禁用输入框前读取 FormData');
+});

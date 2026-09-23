@@ -51,10 +51,11 @@ async function enterApp(user) {
 }
 
 async function submit(form, action) {
+  const data = new FormData(form);
   setBusy(form, true);
   authError.textContent = '';
   try {
-    await action(new FormData(form));
+    await action(data);
   } catch (error) {
     authError.textContent = error.message;
     authError.focus();
