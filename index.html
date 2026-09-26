@@ -28,6 +28,7 @@
       <form class="auth-form" id="register-form" data-auth-panel="register" hidden>
         <label class="field"><span>邮箱</span><input name="email" type="email" autocomplete="email" maxlength="254" required placeholder="name@example.com"></label>
         <label class="field"><span>设置密码</span><input name="password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required placeholder="至少10个字符"></label>
+        <label class="field"><span>再次输入密码</span><input name="passwordConfirmation" type="password" autocomplete="new-password" minlength="10" maxlength="128" required placeholder="请再次输入密码"></label>
         <label class="check-field auth-terms"><input name="acceptedTerms" type="checkbox" required><span><strong>我已阅读并同意用户协议与隐私政策</strong><small>我们只收集提供账号与回款记录同步所必需的数据。</small></span></label>
         <button class="button primary auth-submit" type="submit">创建账号</button>
         <button type="button" class="text-button auth-back" data-auth-view="login">已有账号，返回登录</button>
@@ -41,6 +42,7 @@
 
       <form class="auth-form" id="reset-form" data-auth-panel="reset" hidden>
         <label class="field"><span>新密码</span><input name="password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required placeholder="至少10个字符"></label>
+        <label class="field"><span>再次输入新密码</span><input name="passwordConfirmation" type="password" autocomplete="new-password" minlength="10" maxlength="128" required placeholder="请再次输入新密码"></label>
         <button class="button primary auth-submit" type="submit">保存新密码</button>
       </form>
 

@@ -7,7 +7,7 @@ export class ApiError extends Error {
   }
 }
 
-export function createApiClient(fetchImpl = globalThis.fetch) {
+export function createApiClient(fetchImpl = globalThis.fetch, { onAuthRequired = () => {} } = {}) {
   async function request(path, options = {}) {
     let response;
     try {
@@ -26,6 +26,7 @@ export function createApiClient(fetchImpl = globalThis.fetch) {
     const isJson = response.headers.get('content-type')?.includes('application/json');
     const body = isJson ? await response.json() : null;
     if (!response.ok) {
+      if (response.status === 401 && body?.error?.code === 'AUTH_REQUIRED') onAuthRequired();
       throw new ApiError(body?.error?.message ?? '请求失败，请稍后重试', {
         code: body?.error?.code ?? 'API_ERROR',
         status: response.status,

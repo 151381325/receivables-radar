@@ -43,7 +43,7 @@ test('Web 镜像包含构建产物且 API 以非 root 用户运行', async () =>
   const dockerfile = await readProjectFile('Dockerfile');
   assert.match(dockerfile, /FROM caddy:2-alpine AS web/);
   assert.match(dockerfile, /COPY --from=build \/app\/dist \/srv/);
-  assert.match(dockerfile, /FROM node:22-alpine AS api[\s\S]*?USER node/);
+  assert.match(dockerfile, /FROM node:22-alpine AS api[\s\S]*?COPY --from=build \/app\/src \.\/src[\s\S]*?COPY --from=build \/app\/server \.\/server[\s\S]*?USER node/);
 });
 
 test('备份镜像在降权前为 postgres 用户准备可写目录', async () => {

@@ -32,8 +32,17 @@ test('认证提交在禁用输入框前保留表单数据', async () => {
     source.indexOf("document.addEventListener('click'"),
   );
   const captureIndex = submitSource.indexOf('new FormData(form)');
-  const disableIndex = submitSource.indexOf('setBusy(form, true)');
+  const disableIndex = submitSource.indexOf('runWithFormBusy(form');
 
   assert.ok(captureIndex >= 0, '提交时应读取表单数据');
   assert.ok(captureIndex < disableIndex, '必须在禁用输入框前读取 FormData');
+});
+
+test('注册和重置密码都要求再次输入密码', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const register = html.slice(html.indexOf('id="register-form"'), html.indexOf('id="forgot-form"'));
+  const reset = html.slice(html.indexOf('id="reset-form"'), html.indexOf('data-auth-panel="status"'));
+
+  assert.match(register, /name="passwordConfirmation"[^>]+required/);
+  assert.match(reset, /name="passwordConfirmation"[^>]+required/);
 });

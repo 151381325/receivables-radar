@@ -32,8 +32,16 @@ export async function registerReceivableRoutes(app, { pool, authenticate }) {
     try { return reply.send({ record: await work(record) }); }
     catch (error) { return reply.code(error.code === 'STALE_VERSION' ? 409 : 400).send({ error: { code: error.code ?? 'VALIDATION_ERROR', message: error.message } }); }
   }
-  app.post('/api/receivables/:id/payments', { preHandler: authenticate }, (request, reply) => change(request, reply, (record) => repository.addPayment(request.user.id, record.id, request.body?.version, addPayment(record, request.body ?? {}))));
-  app.post('/api/receivables/:id/follow-ups', { preHandler: authenticate }, (request, reply) => change(request, reply, (record) => repository.addFollowUp(request.user.id, record.id, request.body?.version, addFollowUp(record, request.body ?? {}))));
+  app.post('/api/receivables/:id/payments', { preHandler: authenticate }, (request, reply) => change(request, reply, (record) => {
+    const updated = addPayment(record, request.body ?? {});
+    const payment = updated.paymentRecords.at(-1);
+    return repository.addPayment(request.user.id, record.id, request.body?.version, payment);
+  }));
+  app.post('/api/receivables/:id/follow-ups', { preHandler: authenticate }, (request, reply) => change(request, reply, (record) => {
+    const updated = addFollowUp(record, request.body ?? {});
+    const followUp = updated.followUpRecords.at(-1);
+    return repository.addFollowUp(request.user.id, record.id, request.body?.version, followUp);
+  }));
   app.delete('/api/receivables/:id', { preHandler: authenticate }, async (request, reply) => {
     try { return await repository.softDelete(request.user.id, request.params.id, request.body?.version) ? reply.code(204).send() : reply.code(404).send(); }
     catch (error) { return reply.code(409).send({ error: { code: error.code, message: error.message } }); }

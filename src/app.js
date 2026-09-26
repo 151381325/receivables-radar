@@ -1,6 +1,7 @@
 import { parseBackup, serializeBackup } from './backup.js';
 import { buildCalendarEvent } from './calendar.js';
 import { calculateDashboard, deriveReceivable, getTodayQueue } from './domain.js';
+import { runWithFormBusy } from './form-submit.js';
 import {
   buildPrivacyNoticeHTML,
   buildRecordCardHTML,
@@ -234,32 +235,35 @@ document.addEventListener('click', (event) => {
 
 document.querySelector('#receivable-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const id = document.querySelector('#record-id').value;
-  const dueDate = document.querySelector('#due-date').value;
-  if (dueDate < localDate() && !window.confirm('付款截止日期早于今天，是否作为历史欠款继续保存？')) return;
+  const form = event.currentTarget;
+  await runWithFormBusy(form, async () => {
+    const id = document.querySelector('#record-id').value;
+    const dueDate = document.querySelector('#due-date').value;
+    if (dueDate < localDate() && !window.confirm('付款截止日期早于今天，是否作为历史欠款继续保存？')) return;
 
-  const input = {
-    clientName: document.querySelector('#client-name').value,
-    projectName: document.querySelector('#project-name').value,
-    totalAmount: document.querySelector('#total-amount').value,
-    invoiceSent: document.querySelector('#invoice-sent').checked,
-    dueDate,
-    nextFollowUpDate: document.querySelector('#next-follow-up').value || null,
-    notes: document.querySelector('#notes').value,
-    paused: document.querySelector('#paused').checked,
-  };
+    const input = {
+      clientName: document.querySelector('#client-name').value,
+      projectName: document.querySelector('#project-name').value,
+      totalAmount: document.querySelector('#total-amount').value,
+      invoiceSent: document.querySelector('#invoice-sent').checked,
+      dueDate,
+      nextFollowUpDate: document.querySelector('#next-follow-up').value || null,
+      notes: document.querySelector('#notes').value,
+      paused: document.querySelector('#paused').checked,
+    };
 
-  try {
-    const existing = id ? repository.get(id) : null;
-    await handleMutation(() => (existing
-      ? repository.update(existing.id, { ...input, version: existing.version })
-      : repository.create(input)));
-    render();
-    showView('today');
-    showToast(existing ? '应收信息已更新' : '应收已创建');
-  } catch (error) {
-    document.querySelector('#form-error').textContent = error.message;
-  }
+    try {
+      const existing = id ? repository.get(id) : null;
+      await handleMutation(() => (existing
+        ? repository.update(existing.id, { ...input, version: existing.version })
+        : repository.create(input)));
+      render();
+      showView('today');
+      showToast(existing ? '应收信息已更新' : '应收已创建');
+    } catch (error) {
+      document.querySelector('#form-error').textContent = error.message;
+    }
+  });
 });
 
 document.querySelector('#detail-edit').addEventListener('click', () => {
@@ -294,22 +298,24 @@ document.querySelector('#detail-payment').addEventListener('click', () => {
 
 document.querySelector('#payment-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const record = activeRecord();
-  if (!record) return;
-  try {
-    await handleMutation(() => repository.addPayment(record.id, {
-      version: record.version,
-      amount: document.querySelector('#payment-amount').value,
-      paidAt: document.querySelector('#payment-date').value,
-      method: document.querySelector('#payment-method').value,
-      notes: document.querySelector('#payment-notes').value,
-    }));
-    closeDialogs();
-    render();
-    showToast('到账记录已保存');
-  } catch (error) {
-    document.querySelector('#payment-error').textContent = error.message;
-  }
+  await runWithFormBusy(event.currentTarget, async () => {
+    const record = activeRecord();
+    if (!record) return;
+    try {
+      await handleMutation(() => repository.addPayment(record.id, {
+        version: record.version,
+        amount: document.querySelector('#payment-amount').value,
+        paidAt: document.querySelector('#payment-date').value,
+        method: document.querySelector('#payment-method').value,
+        notes: document.querySelector('#payment-notes').value,
+      }));
+      closeDialogs();
+      render();
+      showToast('到账记录已保存');
+    } catch (error) {
+      document.querySelector('#payment-error').textContent = error.message;
+    }
+  });
 });
 
 document.querySelector('#detail-follow-up').addEventListener('click', () => {
@@ -325,22 +331,24 @@ document.querySelector('#detail-follow-up').addEventListener('click', () => {
 
 document.querySelector('#follow-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const record = activeRecord();
-  if (!record) return;
-  try {
-    await handleMutation(() => repository.addFollowUp(record.id, {
-      version: record.version,
-      followedAt: document.querySelector('#follow-date').value,
-      result: document.querySelector('#follow-result').value,
-      promiseDate: document.querySelector('#promise-date').value || null,
-      nextFollowUpDate: document.querySelector('#follow-next-date').value || null,
-    }));
-    closeDialogs();
-    render();
-    showToast('跟进记录已保存');
-  } catch (error) {
-    document.querySelector('#follow-error').textContent = error.message;
-  }
+  await runWithFormBusy(event.currentTarget, async () => {
+    const record = activeRecord();
+    if (!record) return;
+    try {
+      await handleMutation(() => repository.addFollowUp(record.id, {
+        version: record.version,
+        followedAt: document.querySelector('#follow-date').value,
+        result: document.querySelector('#follow-result').value,
+        promiseDate: document.querySelector('#promise-date').value || null,
+        nextFollowUpDate: document.querySelector('#follow-next-date').value || null,
+      }));
+      closeDialogs();
+      render();
+      showToast('跟进记录已保存');
+    } catch (error) {
+      document.querySelector('#follow-error').textContent = error.message;
+    }
+  });
 });
 
 document.querySelector('#detail-reminder').addEventListener('click', () => {

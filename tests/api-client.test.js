@@ -28,6 +28,18 @@ test('服务端错误映射为带稳定代码的错误', async () => {
   ));
 });
 
+test('登录会话失效时通知认证界面接管', async () => {
+  let authRequiredCount = 0;
+  const api = createApiClient(async () => new Response(JSON.stringify({
+    error: { code: 'AUTH_REQUIRED', message: '请先登录' },
+  }), { status: 401, headers: { 'content-type': 'application/json' } }), {
+    onAuthRequired: () => { authRequiredCount += 1; },
+  });
+
+  await assert.rejects(api.listReceivables(), (error) => error.code === 'AUTH_REQUIRED');
+  assert.equal(authRequiredCount, 1);
+});
+
 test('网络异常转换为可理解且可重试的错误', async () => {
   const api = createApiClient(async () => { throw new TypeError('Failed to fetch'); });
   await assert.rejects(api.getCurrentUser(), (error) => (
