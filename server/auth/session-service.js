@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 
 import { hashOpaqueToken } from './crypto.js';
+import { serializeAuthenticatedUser } from './admin-role.js';
 
 const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -39,11 +40,11 @@ export function createSessionService(pool, config) {
         [hashOpaqueToken(token), now],
       );
       const row = result.rows[0];
-      return row ? {
+      return row ? serializeAuthenticatedUser({
         id: row.id,
         email: row.email,
         emailVerified: Boolean(row.email_verified_at),
-      } : null;
+      }, config.adminEmail) : null;
     },
 
     async destroySession(token) {

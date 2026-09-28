@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import argon2 from 'argon2';
 
 import { createAccountRepository } from '../auth/account-repository.js';
+import { serializeAuthenticatedUser } from '../auth/admin-role.js';
 import { hashOpaqueToken } from '../auth/crypto.js';
 import { createSessionService } from '../auth/session-service.js';
 import { withTransaction } from '../db/pool.js';
@@ -103,7 +104,7 @@ export async function registerAuthRoutes(app, { config, pool, mailer, clock }) {
       expires: result.session.expiresAt,
     });
     return reply.send({
-      user: { id: result.user.id, email: result.user.email, emailVerified: true },
+      user: serializeAuthenticatedUser(result.user, config.adminEmail),
     });
   });
 
@@ -128,7 +129,7 @@ export async function registerAuthRoutes(app, { config, pool, mailer, clock }) {
       expires: session.expiresAt,
     });
     return reply.send({
-      user: { id: user.id, email: user.email, emailVerified: true },
+      user: serializeAuthenticatedUser(user, config.adminEmail),
     });
   });
 
@@ -197,7 +198,7 @@ export async function registerAuthRoutes(app, { config, pool, mailer, clock }) {
       expires: result.session.expiresAt,
     });
     return reply.send({
-      user: { id: result.user.id, email: result.user.email, emailVerified: true },
+      user: serializeAuthenticatedUser(result.user, config.adminEmail),
     });
   });
 }

@@ -67,3 +67,12 @@ test('共享临时数据库的集成测试按单进程执行', async () => {
   const packageJson = JSON.parse(await readProjectFile('package.json'));
   assert.match(packageJson.scripts.test, /--test-concurrency=1/);
 });
+
+test('部署通过环境变量配置管理员且示例文件不写入真实账号', async () => {
+  const [compose, example] = await Promise.all([
+    readProjectFile('compose.yaml'), readProjectFile('.env.example'),
+  ]);
+  const apiBlock = compose.match(/\n  api:\n([\s\S]*?)(?=\n  \w[\w-]*:\n|\nvolumes:)/)?.[1] ?? '';
+  assert.match(apiBlock, /ADMIN_EMAIL: \$\{ADMIN_EMAIL\}/);
+  assert.match(example, /^ADMIN_EMAIL=admin@example\.com$/m);
+});

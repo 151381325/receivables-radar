@@ -24,6 +24,23 @@ test('认证迁移定义受约束的账号表', async () => {
   }
 });
 
+test('管理员审计迁移约束操作类型并保留查询索引', async () => {
+  const sql = await readFile(
+    new URL('../../server/db/migrations/003_admin_actions.sql', import.meta.url),
+    'utf8',
+  );
+
+  for (const fragment of [
+    'CREATE TABLE admin_actions',
+    'actor_user_id uuid NOT NULL REFERENCES users(id)',
+    'target_user_id uuid NOT NULL REFERENCES users(id)',
+    "CHECK (action IN ('disable_user', 'enable_user'))",
+    'CREATE INDEX admin_actions_target_created_idx',
+  ]) {
+    assert.match(sql, new RegExp(fragment.replace(/[()]/g, '\\$&')));
+  }
+});
+
 test('事务成功时提交并释放连接', async () => {
   const calls = [];
   const client = {

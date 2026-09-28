@@ -45,6 +45,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .auth-footnote { color: var(--muted); font-size: 13px; text-align: center; margin: 0; }
 .header-controls { display: flex; align-items: center; gap: 14px; }
 .account-email { color: var(--muted); font-size: 13px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-link { text-decoration: none; }
 .sync-status { color: var(--muted); font-size: 12px; white-space: nowrap; }
 
 .app-shell { min-height: 100vh; }

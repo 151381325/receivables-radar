@@ -3,7 +3,9 @@ import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
 
 import { createSessionService } from './auth/session-service.js';
+import { createAdminRepository } from './admin/repository.js';
 import { createAuthenticate } from './plugins/authenticate.js';
+import { registerAdminRoutes } from './routes/admin.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerReceivableRoutes } from './routes/receivables.js';
 
@@ -23,6 +25,10 @@ export async function buildApp({ config, pool, mailer = null, clock = () => new 
   }));
 
   await registerReceivableRoutes(app, { pool, authenticate });
+  await registerAdminRoutes(app, {
+    repository: createAdminRepository(pool),
+    authenticate,
+  });
 
   app.post('/api/auth/logout', async (request, reply) => {
     const token = request.cookies[sessions.cookieName];

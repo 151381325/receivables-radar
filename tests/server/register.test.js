@@ -8,6 +8,7 @@ import { createPool } from '../../server/db/pool.js';
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const config = {
   nodeEnv: 'test', sessionCookieName: 'rr_session', appOrigin: 'https://example.test',
+  adminEmail: 'owner@example.com',
 };
 
 describe('注册与邮箱验证 PostgreSQL 集成', { skip: !databaseUrl }, () => {
@@ -85,6 +86,7 @@ describe('注册与邮箱验证 PostgreSQL 集成', { skip: !databaseUrl }, () =
 
     assert.equal(response.statusCode, 200);
     assert.equal(response.json().user.emailVerified, true);
+    assert.equal(response.json().user.isAdmin, true);
     assert.match(response.headers['set-cookie'], /rr_session=/);
     const repeated = await app.inject({ method: 'POST', url: '/api/auth/verify-email', payload: {
       token: sent[0].token,

@@ -46,6 +46,8 @@ function showAuthView(view, message = '') {
 
 async function enterApp(user) {
   document.querySelector('#account-email').textContent = user.email;
+  const adminLink = document.querySelector('#admin-link');
+  adminLink.hidden = !user.isAdmin;
   if (!appLoaded) {
     const { startApp } = await import('./app.js');
     await startApp(createCloudRepository(api));

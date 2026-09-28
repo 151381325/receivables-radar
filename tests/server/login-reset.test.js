@@ -10,7 +10,10 @@ import { createPool } from '../../server/db/pool.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const now = new Date('2026-09-13T06:00:00Z');
-const config = { nodeEnv: 'test', sessionCookieName: 'rr_session', appOrigin: 'https://example.test' };
+const config = {
+  nodeEnv: 'test', sessionCookieName: 'rr_session', appOrigin: 'https://example.test',
+  adminEmail: 'owner@example.com',
+};
 
 describe('登录与密码重置 PostgreSQL 集成', { skip: !databaseUrl }, () => {
   let pool;
@@ -62,7 +65,12 @@ describe('登录与密码重置 PostgreSQL 集成', { skip: !databaseUrl }, () =
       email: ' OWNER@example.com ', password: 'old secure password',
     } });
     assert.equal(response.statusCode, 200);
-    assert.equal(response.json().user.email, 'owner@example.com');
+    assert.deepEqual(response.json().user, {
+      id: response.json().user.id,
+      email: 'owner@example.com',
+      emailVerified: true,
+      isAdmin: true,
+    });
     assert.match(response.headers['set-cookie'], /HttpOnly/);
   });
 
@@ -113,6 +121,7 @@ describe('登录与密码重置 PostgreSQL 集成', { skip: !databaseUrl }, () =
     } });
 
     assert.equal(response.statusCode, 200);
+    assert.equal(response.json().user.isAdmin, true);
     assert.match(response.headers['set-cookie'], /rr_session=/);
     assert.equal(await sessions.findUserByToken(oldSessionA.token, now), null);
     assert.equal(await sessions.findUserByToken(oldSessionB.token, now), null);

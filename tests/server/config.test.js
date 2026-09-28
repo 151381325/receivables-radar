@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { loadConfig } from '../../server/config.js';
 
 test('缺少数据库连接时拒绝启动', () => {
-  assert.throws(() => loadConfig({ NODE_ENV: 'test' }), /DATABASE_URL/);
+  assert.throws(() => loadConfig({ NODE_ENV: 'test', ADMIN_EMAIL: 'owner@example.com' }), /DATABASE_URL/);
 });
 
 test('规范化服务端公开配置', () => {
@@ -19,6 +19,7 @@ test('规范化服务端公开配置', () => {
     SMTP_USER: 'sender@example.test',
     SMTP_PASS: 'not-a-real-secret',
     MAIL_FROM: 'sender@example.test',
+    ADMIN_EMAIL: '  Owner@Example.COM  ',
   });
 
   assert.deepEqual(config, {
@@ -28,6 +29,7 @@ test('规范化服务端公开配置', () => {
     databaseUrl: 'postgres://test:test@db/test',
     sessionCookieName: 'rr_session',
     appOrigin: 'https://example.test',
+    adminEmail: 'owner@example.com',
     smtp: {
       host: 'smtp.example.test',
       port: 465,
@@ -47,8 +49,23 @@ test('端口和 SMTP 安全标记必须有效', () => {
     SMTP_USER: 'sender@example.test',
     SMTP_PASS: 'not-a-real-secret',
     MAIL_FROM: 'sender@example.test',
+    ADMIN_EMAIL: 'owner@example.com',
   };
 
   assert.throws(() => loadConfig({ ...base, PORT: 'abc' }), /PORT/);
   assert.throws(() => loadConfig({ ...base, SMTP_SECURE: 'sometimes' }), /SMTP_SECURE/);
+});
+
+test('管理员邮箱必须存在且格式有效', () => {
+  const base = {
+    DATABASE_URL: 'postgres://test:test@db/test',
+    APP_ORIGIN: 'https://example.test',
+    SMTP_HOST: 'smtp.example.test',
+    SMTP_USER: 'sender@example.test',
+    SMTP_PASS: 'not-a-real-secret',
+    MAIL_FROM: 'sender@example.test',
+  };
+
+  assert.throws(() => loadConfig(base), /ADMIN_EMAIL/);
+  assert.throws(() => loadConfig({ ...base, ADMIN_EMAIL: 'not-an-email' }), /ADMIN_EMAIL/);
 });

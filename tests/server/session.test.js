@@ -11,6 +11,7 @@ const config = {
   nodeEnv: 'test',
   sessionCookieName: 'rr_session',
   appOrigin: 'https://example.test',
+  adminEmail: 'owner@example.com',
 };
 
 test('健康检查公开且当前用户接口要求登录', async () => {
@@ -57,8 +58,24 @@ test('有效会话返回最小用户信息', async () => {
 
   assert.equal(response.statusCode, 200);
   assert.deepEqual(response.json(), {
-    user: { id: 'user-1', email: 'owner@example.com', emailVerified: true },
+    user: { id: 'user-1', email: 'owner@example.com', emailVerified: true, isAdmin: true },
   });
+  await app.close();
+});
+
+test('普通用户会话明确返回非管理员身份', async () => {
+  const pool = {
+    query: async () => ({ rows: [{
+      id: 'user-2', email: 'member@example.com', email_verified_at: new Date('2026-09-13T03:00:00Z'),
+    }] }),
+  };
+  const app = await buildApp({ config, pool, clock: () => new Date('2026-09-13T04:00:00Z') });
+  const response = await app.inject({
+    method: 'GET', url: '/api/auth/me', headers: { cookie: 'rr_session=valid-session-token' },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().user.isAdmin, false);
   await app.close();
 });
 

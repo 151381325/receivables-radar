@@ -23,7 +23,7 @@ cp .env.example .env
 chmod 600 .env
 ```
 
-编辑 `.env`，至少替换数据库密码、正式域名、SMTP 凭证、备份加密密钥和 COS 目标。`APP_ORIGIN` 与 `SITE_ADDRESS` 均使用同一个 `https://正式域名`。生成随机值可使用：
+编辑 `.env`，至少替换数据库密码、正式域名、SMTP 凭证、备份加密密钥和 COS 目标。`APP_ORIGIN` 与 `SITE_ADDRESS` 均使用同一个 `https://正式域名`。`ADMIN_EMAIL` 必须填写一个已注册且由项目负责人控制的邮箱；部署后该账号登录时会获得 `/admin/` 用户管理权限。不要把真实邮箱写进代码或 `.env.example`。生成随机值可使用：
 
 ```bash
 openssl rand -base64 36

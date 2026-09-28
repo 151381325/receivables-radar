@@ -59,3 +59,23 @@ test('删除应收使用版本号避免覆盖其他设备的数据', async () =>
   assert.equal(calls[0].options.method, 'DELETE');
   assert.equal(calls[0].options.body, JSON.stringify({ version: 3 }));
 });
+
+test('管理员客户端安全编码查询条件并更新账号状态', async () => {
+  const calls = [];
+  const api = createApiClient(async (url, options) => {
+    calls.push({ url, options });
+    return new Response(JSON.stringify(url.includes('/status')
+      ? { changed: true, user: { id: 'user/1', disabled: true } }
+      : { users: [], pagination: { page: 2, pageSize: 50, total: 0, totalPages: 0 } }), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    });
+  });
+
+  await api.listAdminUsers({ page: 2, pageSize: 50, status: 'unverified', query: 'a+b@example.com' });
+  await api.setAdminUserDisabled('user/1', true);
+
+  assert.equal(calls[0].url, '/api/admin/users?page=2&pageSize=50&status=unverified&query=a%2Bb%40example.com');
+  assert.equal(calls[1].url, '/api/admin/users/user%2F1/status');
+  assert.equal(calls[1].options.method, 'PATCH');
+  assert.equal(calls[1].options.body, JSON.stringify({ disabled: true }));
+});

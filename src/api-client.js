@@ -37,6 +37,7 @@ export function createApiClient(fetchImpl = globalThis.fetch, { onAuthRequired =
 
   const post = (path, input) => request(path, { method: 'POST', body: JSON.stringify(input ?? {}) });
   const put = (path, input) => request(path, { method: 'PUT', body: JSON.stringify(input ?? {}) });
+  const patch = (path, input) => request(path, { method: 'PATCH', body: JSON.stringify(input ?? {}) });
   const remove = (path, input) => request(path, { method: 'DELETE', body: JSON.stringify(input ?? {}) });
   return {
     request,
@@ -54,5 +55,15 @@ export function createApiClient(fetchImpl = globalThis.fetch, { onAuthRequired =
     addFollowUp: (id, input) => post(`/api/receivables/${id}/follow-ups`, input).then((body) => body.record),
     deleteReceivable: (id, version) => remove(`/api/receivables/${id}`, { version }),
     importReceivables: (records) => post('/api/receivables/import', { records }),
+    getAdminSummary: () => request('/api/admin/summary'),
+    listAdminUsers: ({ page = 1, pageSize = 20, status = 'all', query = '' } = {}) => {
+      const search = new URLSearchParams({
+        page: String(page), pageSize: String(pageSize), status, query,
+      });
+      return request(`/api/admin/users?${search}`);
+    },
+    setAdminUserDisabled: (id, disabled) => patch(
+      `/api/admin/users/${encodeURIComponent(id)}/status`, { disabled },
+    ),
   };
 }

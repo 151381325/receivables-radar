@@ -1,3 +1,7 @@
+import { normalizeEmail } from './auth/crypto.js';
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function required(env, name) {
   const value = env[name]?.trim();
   if (!value) throw new Error(`${name} is required`);
@@ -20,6 +24,11 @@ function parseBoolean(value, name, fallback) {
 }
 
 export function loadConfig(env = process.env) {
+  const adminEmail = normalizeEmail(required(env, 'ADMIN_EMAIL'));
+  if (adminEmail.length > 254 || !EMAIL_PATTERN.test(adminEmail)) {
+    throw new Error('ADMIN_EMAIL must be a valid email address');
+  }
+
   return {
     nodeEnv: env.NODE_ENV ?? 'development',
     host: env.HOST ?? '0.0.0.0',
@@ -27,6 +36,7 @@ export function loadConfig(env = process.env) {
     databaseUrl: required(env, 'DATABASE_URL'),
     sessionCookieName: env.SESSION_COOKIE_NAME?.trim() || 'rr_session',
     appOrigin: required(env, 'APP_ORIGIN'),
+    adminEmail,
     smtp: {
       host: required(env, 'SMTP_HOST'),
       port: parsePort(env.SMTP_PORT, 'SMTP_PORT', '465'),

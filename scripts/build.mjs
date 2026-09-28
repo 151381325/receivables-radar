@@ -8,3 +8,4 @@ await cp(new URL('../index.html', import.meta.url), new URL('index.html', output
 await cp(new URL('../src/', import.meta.url), new URL('src/', outputDirectory), { recursive: true });
 await cp(new URL('../terms/', import.meta.url), new URL('terms/', outputDirectory), { recursive: true });
 await cp(new URL('../privacy/', import.meta.url), new URL('privacy/', outputDirectory), { recursive: true });
+await cp(new URL('../admin/', import.meta.url), new URL('admin/', outputDirectory), { recursive: true });
