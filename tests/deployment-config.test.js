@@ -25,6 +25,11 @@ test('API 配置健康检查且 Caddy 同源代理 API 和静态站点', async (
   assert.match(caddy, /file_server/);
 });
 
+test('Caddy 优先解析真实目录后再回退到单页应用', async () => {
+  const caddy = await readProjectFile('deploy/Caddyfile');
+  assert.match(caddy, /try_files \{path\} \{path\}\/ \/index\.html/);
+});
+
 test('部署包含备份和隔离恢复校验入口', async () => {
   const [compose, backup, restore] = await Promise.all([
     readProjectFile('compose.yaml'),
