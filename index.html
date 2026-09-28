@@ -29,7 +29,7 @@
         <label class="field"><span>邮箱</span><input name="email" type="email" autocomplete="email" maxlength="254" required placeholder="name@example.com"></label>
         <label class="field"><span>设置密码</span><input name="password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required placeholder="至少10个字符"></label>
         <label class="field"><span>再次输入密码</span><input name="passwordConfirmation" type="password" autocomplete="new-password" minlength="10" maxlength="128" required placeholder="请再次输入密码"></label>
-        <label class="check-field auth-terms"><input name="acceptedTerms" type="checkbox" required><span><strong>我已阅读并同意用户协议与隐私政策</strong><small>我们只收集提供账号与回款记录同步所必需的数据。</small></span></label>
+        <label class="check-field auth-terms"><input name="acceptedTerms" type="checkbox" required><span><strong>我已阅读并同意 <a href="./terms/" target="_blank" rel="noopener">用户协议</a> 与 <a href="./privacy/" target="_blank" rel="noopener">隐私政策</a></strong><small>我们只收集提供账号与回款记录同步所必需的数据。</small></span></label>
         <button class="button primary auth-submit" type="submit">创建账号</button>
         <button type="button" class="text-button auth-back" data-auth-view="login">已有账号，返回登录</button>
       </form>
@@ -76,7 +76,7 @@
         </div>
         <div class="privacy-note">
           <span class="privacy-icon" aria-hidden="true">⌾</span>
-          <div><strong>数据分级保护</strong><p>账号用于安全登录；当前应收记录仍保存在本机</p><button class="privacy-link" type="button" data-open-privacy>隐私与数据说明</button></div>
+          <div><strong>数据分级保护</strong><p>账号与应收记录通过服务器在电脑和手机间同步</p><button class="privacy-link" type="button" data-open-privacy>隐私与数据说明</button></div>
         </div>
       </aside>
 
@@ -115,7 +115,7 @@
                 <button class="text-button" type="button" data-view="all">查看全部应收 <span>→</span></button>
               </section>
               <section class="panel data-card">
-                <div><span class="data-icon" aria-hidden="true">⇩</span><div><strong>备份本地数据</strong><p>建议每周导出一次 JSON</p></div></div>
+                <div><span class="data-icon" aria-hidden="true">⇩</span><div><strong>导出数据备份</strong><p>建议每周导出一次 JSON</p></div></div>
                 <button class="button quiet" type="button" id="export-backup">导出备份</button>
                 <button class="text-button small" type="button" id="import-backup">恢复备份</button>
                 <button class="privacy-link data-privacy-link" type="button" data-open-privacy>查看隐私与数据说明</button>
@@ -239,6 +239,15 @@
     <div class="privacy-content" id="privacy-content"></div>
     <div class="modal-actions"><button class="button primary" type="button" data-close-dialog>我知道了</button></div>
   </dialog>
+
+  <footer class="site-footer">
+    <div>
+      <span>© 2026 回款雷达</span>
+      <a href="./terms/">用户协议</a>
+      <a href="./privacy/">隐私政策</a>
+      <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">渝ICP备2026023184号-1</a>
+    </div>
+  </footer>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script type="module" src="./src/auth-ui.js"></script>

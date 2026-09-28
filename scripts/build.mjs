@@ -6,3 +6,5 @@ await rm(outputDirectory, { recursive: true, force: true });
 await mkdir(outputDirectory, { recursive: true });
 await cp(new URL('../index.html', import.meta.url), new URL('index.html', outputDirectory));
 await cp(new URL('../src/', import.meta.url), new URL('src/', outputDirectory), { recursive: true });
+await cp(new URL('../terms/', import.meta.url), new URL('terms/', outputDirectory), { recursive: true });
+await cp(new URL('../privacy/', import.meta.url), new URL('privacy/', outputDirectory), { recursive: true });

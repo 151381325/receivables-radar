@@ -35,19 +35,23 @@ export function buildPrivacyNoticeHTML() {
   return `
     <section class="privacy-section">
       <h3>数据保存在哪里？</h3>
-      <p>你录入的应收、跟进和到账记录仅保存在当前浏览器中，不会上传到回款雷达的服务器。</p>
+      <p>账号信息以及你录入的应收、跟进和到账记录会保存到回款雷达的服务器，用于账号登录、数据同步和回款管理。</p>
     </section>
     <section class="privacy-section">
-      <h3>不同设备不会自动同步</h3>
-      <p>手机和电脑各自保存独立数据。如需迁移，请先在原设备导出备份，再在新设备恢复备份。</p>
+      <h3>电脑和手机会同步数据</h3>
+      <p>使用同一账号登录后，服务器会向不同设备提供同一份业务记录。请妥善保管密码，不要与他人共用账号。</p>
     </section>
     <section class="privacy-section">
       <h3>请主动做好备份</h3>
-      <p>清除浏览器数据、使用无痕模式、更换设备或卸载浏览器都可能造成记录丢失，建议定期导出备份。</p>
+      <p>云端同步不能代替备份。建议定期导出备份文件并妥善保存，以便发生误删或异常时恢复记录。</p>
     </section>
     <section class="privacy-section">
       <h3>不要录入敏感信息</h3>
       <p>请勿在客户名称、项目名称或备注中填写银行卡号、身份证号、密码、验证码等敏感信息。</p>
+    </section>
+    <section class="privacy-section">
+      <h3>了解你的数据权利</h3>
+      <p>你可以在站内查看、修改、删除或导出业务记录。账号注销和全部数据删除请按<a href="./privacy/" target="_blank" rel="noopener">完整隐私政策</a>中的方式联系我们。</p>
     </section>`;
 }
 

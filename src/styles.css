@@ -24,7 +24,7 @@ button { color: inherit; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid rgba(194, 65, 12, .24); outline-offset: 2px; }
 [hidden] { display: none !important; }
 
-.auth-shell { min-height: 100vh; padding: 40px 20px; display: grid; place-items: center; align-content: center; gap: 24px; }
+.auth-shell { min-height: calc(100vh - 78px); padding: 40px 20px; display: grid; place-items: center; align-content: center; gap: 24px; }
 .auth-brand { display: flex; align-items: center; gap: 12px; }
 .auth-brand strong, .auth-brand small { display: block; }
 .auth-brand strong { font-size: 23px; }
@@ -37,6 +37,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .auth-links { display: flex; justify-content: space-between; margin-top: 12px; }
 .auth-back { justify-self: center; margin-top: 10px; }
 .auth-terms { margin: 2px 0 18px; }
+.auth-terms a { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; }
 .auth-error { margin: 12px 0 0; font-size: 14px; }
 .auth-status { text-align: center; justify-items: center; gap: 16px; }
 .auth-status p { color: var(--muted); line-height: 1.7; margin: 0; }
@@ -195,6 +196,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .privacy-section:last-child { border-bottom: 0; padding-bottom: 0; }
 .privacy-section h3 { margin: 0 0 7px; font-size: 16px; }
 .privacy-section p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.75; }
+.privacy-section a { color: var(--primary); font-weight: 750; }
+
+.site-footer { min-height: 78px; padding: 22px 28px; border-top: 1px solid var(--line); background: rgba(255,253,249,.9); color: var(--muted); }
+.site-footer > div { max-width: 1320px; margin: 0 auto; display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 10px 20px; font-size: 12px; }
+.site-footer a { color: var(--muted); text-decoration: none; }
+.site-footer a:hover { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; }
 
 .toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); background: #183b36; color: white; border-radius: 10px; padding: 11px 16px; font-size: 13px; opacity: 0; pointer-events: none; transition: .2s ease; z-index: 100; box-shadow: var(--shadow); }
 .toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
@@ -257,6 +264,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .auth-card h1 { font-size: 38px; }
   .account-email, [data-refresh-records], .sync-status { display: none; }
   .header-controls { gap: 8px; }
+  .site-footer { padding: 20px 16px 90px; }
+  .site-footer > div { gap: 10px 16px; }
 }
 
 @media (max-width: 390px) {

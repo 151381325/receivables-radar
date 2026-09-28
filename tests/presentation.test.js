@@ -46,12 +46,15 @@ test('状态筛选支持全部和指定状态', () => {
   assert.deepEqual(filterRecords(records, 'paid').map((item) => item.id), ['r2']);
 });
 
-test('隐私说明完整告知本地存储、同步限制、清理风险、备份和敏感信息边界', () => {
+test('隐私说明准确告知云端同步、用途、备份和敏感信息边界', () => {
   const html = buildPrivacyNoticeHTML();
 
-  assert.match(html, /仅保存在当前浏览器/);
-  assert.match(html, /不会自动同步/);
-  assert.match(html, /清除浏览器数据/);
+  assert.match(html, /服务器/);
+  assert.match(html, /电脑和手机/);
+  assert.match(html, /账号登录/);
   assert.match(html, /导出备份/);
   assert.match(html, /银行卡号/);
+  assert.match(html, /完整隐私政策/);
+  assert.doesNotMatch(html, /仅保存在当前浏览器/);
+  assert.doesNotMatch(html, /不会上传到回款雷达的服务器/);
 });
