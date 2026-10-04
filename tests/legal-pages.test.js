@@ -26,6 +26,24 @@ test('全站页脚公示 ICP 备案号并链接工信部备案系统', async () 
   assert.match(html, /https:\/\/beian\.miit\.gov\.cn\//);
 });
 
+test('公开页面页脚公示公安联网备案号并链接公安备案查询页', async () => {
+  const publicPages = [
+    'index.html',
+    'terms/index.html',
+    'privacy/index.html',
+  ];
+
+  for (const page of publicPages) {
+    const html = await readProjectFile(page);
+    assert.match(html, /渝公网安备50019002505752号/, `${page} 缺少公安联网备案号`);
+    assert.match(
+      html,
+      /https:\/\/beian\.mps\.gov\.cn\/#\/query\/webSearch\?code=50019002505752/,
+      `${page} 缺少公安联网备案查询链接`,
+    );
+  }
+});
+
 test('用户协议页面公开说明服务边界和用户责任', async () => {
   const html = await readProjectFile('terms/index.html');
 
