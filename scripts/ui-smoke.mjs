@@ -11,6 +11,7 @@ import { createReceivable, addFollowUp, addPayment, removePayment } from '../src
 import { FEATURE_CATALOG, getFreeEntitlements } from '../server/entitlements.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
+const siteRoot = process.argv.includes('--dist') ? join(root, 'dist') : root;
 const artifacts = join(root, 'tmp', 'ui-smoke');
 await mkdir(artifacts, { recursive: true });
 const localToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -51,9 +52,9 @@ const server = createServer(async (req, res) => {
       records[index]={...updated,version:old.version+1};return json(res,200,{record:records[index]});
     }
     if(path.startsWith('/api/'))return json(res,404,{error:{message:'未实现的测试请求'}});
-    if(!['/','/index.html'].includes(path)&&!path.startsWith('/src/')&&!path.startsWith('/privacy/')&&!path.startsWith('/terms/')){res.writeHead(404);res.end();return;}
-    const file=resolve(root,'.'+decodeURIComponent(path==='/'?'/index.html':path));
-    if(!file.startsWith(root)){res.writeHead(403);res.end();return;}
+    if(!['/','/index.html'].includes(path)&&!path.startsWith('/src/')&&!path.startsWith('/assets/')&&!path.startsWith('/privacy/')&&!path.startsWith('/terms/')){res.writeHead(404);res.end();return;}
+    const file=resolve(siteRoot,'.'+decodeURIComponent(path==='/'?'/index.html':path));
+    if(!file.startsWith(resolve(siteRoot)+'\\')&&!file.startsWith(resolve(siteRoot)+'/')){res.writeHead(403);res.end();return;}
     let data=await readFile(file);
     if (serveOnly && extname(file) === '.html') data = Buffer.from(data.toString().replace('<body>', '<body><div style="position:sticky;top:0;z-index:9999;background:#facc15;color:#111;padding:8px;text-align:center">测试版 · 仅示例数据 · 不连接正式账号</div>'));
     res.writeHead(200,{'content-type':({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png'})[extname(file)]||'application/octet-stream'});res.end(data);
