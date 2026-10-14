@@ -60,6 +60,30 @@ npm test
 
 测试覆盖状态计算、金额校验、今日行动、到账、跟进、本地存储、JSON 备份恢复、催款文案和日历导出。
 
+## Android 安装包
+
+当前仓库包含 Capacitor Android 外壳，正式版本为1.0.1（versionCode 2），直接加载正式 HTTPS 网站。JSON备份和ICS日历导出通过系统文件保存窗口完成，不申请广泛存储权限。原生推送、完整离线运行和支付尚未接入。
+
+构建要求：
+
+- JDK 21（Capacitor 8 的 Android 工程要求 Java 21）。
+- Android SDK，并设置 `ANDROID_HOME` 或 `ANDROID_SDK_ROOT`。
+- 已执行 `npm ci`。
+
+在 Windows PowerShell 中运行：
+
+```powershell
+npm run android:build:debug
+```
+
+生成文件位于：
+
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Debug APK 仅用于测试，不得覆盖正式签名安装。独立示例数据测试包可在 Gradle 构建时传 `-PradarUiTest=true`，包名增加 `.uitest`；release 始终禁用该测试入口。正式构建使用 `gradlew.bat testDebugUnitTest lintRelease assembleRelease`，从本地被忽略的 `android/keystore.properties` 读取已有签名材料；不得将该文件或私钥提交。更新时保持同包名、同签名并覆盖安装，不卸载、不清数据。应用商店上架与多机型完整验收仍需单独完成。
+
 ## MVP 边界
 
-当前阶段不包含多人协作、自动发送消息、支付、发票开具、复杂报表、客户管理、PWA/Android 打包或应用商店发布。单人账号的电脑/手机网页登录和云端同步已包含在 MVP 内。
+当前阶段不包含多人协作、自动发送消息、支付、发票开具、复杂报表、客户管理、PWA、应用商店正式发布或原生推送通知。单人账号的电脑/手机网页登录、云端同步，以及供本人真机验收的 Android Debug APK 已包含在 MVP 内。

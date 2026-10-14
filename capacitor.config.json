@@ -1,0 +1,9 @@
+{
+  "appId": "cn.huikuanleida.app",
+  "appName": "回款雷达",
+  "webDir": "dist",
+  "server": {
+    "url": "https://huikuanleida.cn",
+    "cleartext": false
+  }
+}

@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "android:build:debug": "npm run android:sync && cd android && gradlew.bat assembleDebug",
+    "android:lint": "cd android && gradlew.bat lintDebug",
+    "android:sync": "npm run build && cap sync android",
+    "android:test": "cd android && gradlew.bat testDebugUnitTest",
     "build": "node scripts/build.mjs",
     "db:migrate": "node server/db/migrate.js",
     "dev:api": "node --watch server/main.js",
@@ -11,11 +15,16 @@
     "test": "node --test --test-concurrency=1"
   },
   "dependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/core": "8.5.2",
     "@fastify/cookie": "^11.1.2",
     "@fastify/rate-limit": "^11.2.0",
     "argon2": "^0.45.1",
-    "fastify": "^5.12.4",
+    "fastify": "^5.12.5",
     "nodemailer": "^10.0.9",
     "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.2"
   }
 }

@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">回款雷达</string>
+    <string name="title_activity_main">回款雷达</string>
+    <string name="package_name">cn.huikuanleida.app</string>
+    <string name="custom_url_scheme">cn.huikuanleida.app</string>
+    <string name="privacy_title">欢迎使用回款雷达</string>
+    <string name="privacy_intro">在使用前，请阅读并了解我们如何处理你的账号及回款记录。我们坚持最小必要原则，仅处理提供服务所需的数据。</string>
+    <string name="privacy_notice">点击“同意并继续”，表示你已阅读并同意用户协议与隐私政策。你可以点击下方链接查看完整内容。</string>
+    <string name="privacy_terms_link">查看《用户协议》</string>
+    <string name="privacy_policy_link">查看《隐私政策》</string>
+    <string name="privacy_accept">同意并继续</string>
+    <string name="privacy_reject">不同意并退出</string>
+</resources>
