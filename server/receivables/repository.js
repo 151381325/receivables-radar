@@ -7,17 +7,23 @@ function staleVersionError() {
   return error;
 }
 
+// pg parses DATE as local midnight. Preserve that calendar date, not its UTC instant.
+function calendarDate(date) {
+  if (!date) return null;
+  return `${String(date.getFullYear()).padStart(4, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 function mapReceivable(row, payments = [], followUps = []) {
   if (!row) return null;
   return {
     id: row.id, clientName: row.client_name, projectName: row.project_name,
     totalAmount: fenToYuan(Number(row.total_amount_fen)), invoiceSent: row.invoice_sent,
-    dueDate: row.due_date.toISOString().slice(0, 10),
-    nextFollowUpDate: row.next_follow_up_date?.toISOString().slice(0, 10) ?? null,
+    dueDate: calendarDate(row.due_date),
+    nextFollowUpDate: calendarDate(row.next_follow_up_date),
     paused: row.paused, notes: row.notes, version: row.version,
     createdAt: row.created_at.toISOString(), updatedAt: row.updated_at.toISOString(),
-    paymentRecords: payments.map((item) => ({ id: item.id, amount: fenToYuan(Number(item.amount_fen)), paidAt: item.paid_at.toISOString().slice(0, 10), method: item.method, notes: item.notes })),
-    followUpRecords: followUps.map((item) => ({ id: item.id, followedAt: item.followed_at.toISOString().slice(0, 10), result: item.result, promiseDate: item.promise_date?.toISOString().slice(0, 10) ?? null, promiseAction: item.promise_action ?? (item.promise_date ? 'set' : 'keep'), nextFollowUpDate: item.next_follow_up_date?.toISOString().slice(0, 10) ?? null })),
+    paymentRecords: payments.map((item) => ({ id: item.id, amount: fenToYuan(Number(item.amount_fen)), paidAt: calendarDate(item.paid_at), method: item.method, notes: item.notes })),
+    followUpRecords: followUps.map((item) => ({ id: item.id, followedAt: calendarDate(item.followed_at), result: item.result, promiseDate: calendarDate(item.promise_date), promiseAction: item.promise_action ?? (item.promise_date ? 'set' : 'keep'), nextFollowUpDate: calendarDate(item.next_follow_up_date) })),
   };
 }
 

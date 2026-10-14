@@ -195,6 +195,8 @@ function openForm(record = null) {
   form.reset();
   document.querySelector('#form-error').textContent = '';
   document.querySelector('#record-id').value = record?.id ?? '';
+  // Keep the version that supplied these inputs, not a later refreshed cache version.
+  form.dataset.recordVersion = record ? String(record.version) : '';
   document.querySelector('#form-title').textContent = record ? '编辑应收' : '新建应收';
   document.querySelector('#pause-field').hidden = !record;
 
@@ -336,15 +338,16 @@ document.querySelector('#receivable-form').addEventListener('submit', async (eve
     };
 
     try {
-      const existing = id ? repository.get(id) : null;
-      await handleMutation(() => (existing
-        ? repository.update(existing.id, { ...input, version: existing.version })
+      await handleMutation(() => (id
+        ? repository.update(id, { ...input, version: Number(form.dataset.recordVersion) })
         : repository.create(input)));
       render();
       showView('today');
-      showToast(existing ? '应收信息已更新' : '应收已创建');
+      showToast(id ? '应收信息已更新' : '应收已创建');
     } catch (error) {
-      document.querySelector('#form-error').textContent = error.message;
+      document.querySelector('#form-error').textContent = error.code === 'STALE_VERSION'
+        ? '记录已在其他设备更新。你的输入已保留，请核对最新记录后重新打开编辑。'
+        : error.message;
     }
   });
 });

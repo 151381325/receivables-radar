@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve, extname } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { createReceivable, addFollowUp, addPayment, removePayment } from '../src/domain.js';
+import { createReceivable, updateReceivable, addFollowUp, addPayment, removePayment } from '../src/domain.js';
 import { FEATURE_CATALOG, getFreeEntitlements } from '../server/entitlements.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -24,6 +24,8 @@ let records = [
 records[0] = { ...addPayment(records[0], { amount: 2000, paidAt: shift(-2), method: '银行转账' }), version: 1 };
 let offline = false;
 let authenticated = true;
+const mutationRequests = [];
+let mutationGate = null;
 const json = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
 const server = createServer(async (req, res) => {
   try {
@@ -37,6 +39,8 @@ const server = createServer(async (req, res) => {
       if (req.method === 'GET') return json(res,200,{records});
       let body = ''; for await (const chunk of req) body += chunk;
       const input = JSON.parse(body || '{}');
+      mutationRequests.push({ method: req.method, path, version: input.version });
+      if (mutationGate) await mutationGate;
       if (path === '/api/receivables' && req.method === 'POST') {
         const record={...createReceivable(input),version:1}; records.push(record); return json(res,201,{record});
       }
@@ -48,6 +52,7 @@ const server = createServer(async (req, res) => {
       if(parts[4]==='follow-ups')updated=addFollowUp(old,input);
       else if(parts[4]==='payments'&&req.method==='DELETE')updated=removePayment(old,decodeURIComponent(parts[5]));
       else if(parts[4]==='payments')updated=addPayment(old,input);
+      else if(req.method==='PUT' && parts.length===4)updated=updateReceivable(old,input);
       else return json(res,404,{error:{message:'未实现的测试请求'}});
       records[index]={...updated,version:old.version+1};return json(res,200,{record:records[index]});
     }
@@ -90,6 +95,145 @@ try {
   assert.equal(await evaluate("document.querySelector('#metric-outstanding').textContent"),'¥28,600.00');
   assert.equal(await evaluate("document.querySelector('#today-list').children.length"),2);
   await screenshot('desktop.png');
+  acceptance: {
+  if (process.argv.includes('--sync-conflict-acceptance')) {
+    // A fixture-side change represents another device; no production API is used.
+    for (const width of [1440, 390]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 1000, deviceScaleFactor: 1, mobile: width === 390 });
+    const index = records.findIndex(record => record.id === 'smoke-2');
+    const openedVersion = records[index].version;
+    await evaluate("document.querySelector('[data-view=all]').click();document.querySelector('[data-open-record=smoke-2]').click();document.querySelector('#detail-edit').click();document.querySelector('#notes').value='B端未保存草稿'");
+    records[index] = { ...records[index], notes: 'A端最新修改，不能被旧稿覆盖', version: openedVersion + 1 };
+    // Reproduce the same path used by focus/online/periodic refresh while editing.
+    await evaluate("document.querySelector('[data-refresh-records]').click()");
+    await wait("document.querySelector('#sync-status').textContent.includes('已同步')");
+    assert.equal(await evaluate("document.querySelector('#notes').value"), 'B端未保存草稿');
+    await evaluate("document.querySelector('#receivable-form').requestSubmit()");
+    await wait("document.querySelector('#receivable-form').dataset.busy!=='true'");
+    await screenshot(`sync-stale-editor-after-save-${width}.png`);
+    assert.equal(mutationRequests.at(-1)?.version, openedVersion);
+    assert.equal(records[index].notes, 'A端最新修改，不能被旧稿覆盖', 'Refreshing a stale editor must not silently overwrite the other device');
+    assert.equal(records[index].version, openedVersion + 1);
+    assert.equal(await evaluate("!document.querySelector('#view-form').hidden"), true);
+    assert.equal(await evaluate("document.querySelector('#notes').value"), 'B端未保存草稿');
+    assert.equal(await evaluate("document.querySelector('#form-error').textContent.includes('其他设备')"), true);
+    // Clicking save again must not silently upgrade the stale editor version.
+    await evaluate("document.querySelector('#receivable-form').requestSubmit()");
+    await wait("document.querySelector('#receivable-form').dataset.busy!=='true'");
+    assert.equal(records[index].version, openedVersion + 1);
+    assert.equal(records[index].notes, 'A端最新修改，不能被旧稿覆盖');
+    // Explicitly reopening loads the new baseline and permits an intentional edit.
+    await evaluate("window.__radarHandleBack();document.querySelector('[data-view=all]').click();document.querySelector('[data-open-record=smoke-2]').click();document.querySelector('#detail-edit').click()");
+    assert.equal(await evaluate("document.querySelector('#notes').value"), 'A端最新修改，不能被旧稿覆盖');
+    await evaluate("document.querySelector('#notes').value='核对后重新编辑';document.querySelector('#receivable-form').requestSubmit()");
+    await wait("!document.querySelector('#view-today').hidden");
+    assert.equal(records[index].notes, '核对后重新编辑');
+    assert.equal(records[index].version, openedVersion + 2);
+    console.log(`SYNC_CONFLICT_ACCEPTANCE_PASS width=${width}: stale save and retry blocked, remote changes and draft retained, explicit reopen saves`);
+    }
+    await evaluate("document.querySelector('[data-view=all]').click();document.querySelector('[data-open-record=smoke-3]').click();document.querySelector('#detail-edit').click();document.querySelector('#notes').value='另一端删除前的草稿'");
+    records = records.filter(record => record.id !== 'smoke-3');
+    const countAfterDelete = records.length;
+    await evaluate("document.querySelector('[data-refresh-records]').click()");
+    await wait("document.querySelector('#sync-status').textContent.includes('已同步')");
+    await evaluate("document.querySelector('#receivable-form').requestSubmit()");
+    await wait("document.querySelector('#receivable-form').dataset.busy!=='true'");
+    assert.equal(records.length, countAfterDelete, 'A deleted record must not be recreated by its stale editor');
+    assert.equal(mutationRequests.at(-1).method, 'PUT');
+    assert.equal(await evaluate("document.querySelector('#form-error').textContent.includes('不存在') && document.querySelector('#notes').value==='另一端删除前的草稿'"), true);
+    assert.deepEqual(errors, []);
+    console.log('SYNC_DELETED_RECORD_PASS: stale edit does not recreate remotely deleted record');
+    break acceptance;
+  }
+  if (process.argv.includes('--duplicate-save-acceptance')) {
+    async function submitRepeatedly(formId, width, kind, assertSaved) {
+      const beforeRequests = mutationRequests.length;
+      const beforeRecords = JSON.stringify(records);
+      let release;
+      mutationGate = new Promise(resolve => { release = resolve; });
+      try {
+        await evaluate(`(()=>{const form=document.getElementById(${JSON.stringify(formId)});const button=form.querySelector('button[type=submit]');for(let i=0;i<10;i++)button.click();for(let i=0;i<10;i++)form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));})()`);
+        await wait(`document.getElementById(${JSON.stringify(formId)}).dataset.busy==='true'`);
+        for(let attempt=0;attempt<30 && mutationRequests.length===beforeRequests;attempt++) await pause(50);
+        assert.equal(mutationRequests.length, beforeRequests + 1, `${kind}: twenty repeated attempts send only one request`);
+        assert.equal(JSON.stringify(records), beforeRecords, `${kind}: gated response leaves fixture data unchanged`);
+        assert.equal(await evaluate(`document.getElementById(${JSON.stringify(formId)}).querySelector('button[type=submit]').disabled`), true);
+        assert.equal(await evaluate(`document.getElementById(${JSON.stringify(formId)}).querySelector('button[type=submit]').textContent`), '请稍候…');
+        await screenshot(`duplicate-save-${kind}-${width}.png`);
+      } finally {
+        release();
+        mutationGate = null;
+      }
+      await wait(`document.getElementById(${JSON.stringify(formId)}).dataset.busy!=='true'`);
+      await pause(150);
+      assert.equal(mutationRequests.length, beforeRequests + 1);
+      assert.equal(await evaluate(`document.getElementById(${JSON.stringify(formId)}).querySelector('button[type=submit]').disabled`), false);
+      assertSaved();
+      console.log(`DUPLICATE_SAVE_PASS width=${width} kind=${kind}: 10 clicks + 10 submit events, one request, one saved entry, controls restored`);
+    }
+    for (const width of [1440, 390]) {
+      await send('Emulation.setDeviceMetricsOverride', { width, height: 1000, deviceScaleFactor: 1, mobile: width === 390 });
+      const count = records.length;
+      const client = `重复保存验收${width}`;
+      await evaluate(`document.querySelector('[data-new-record]').click();document.querySelector('#client-name').value=${JSON.stringify(client)};document.querySelector('#project-name').value='隔离测试';document.querySelector('#total-amount').value='123.45';document.querySelector('#invoice-sent').checked=true`);
+      await submitRepeatedly('receivable-form', width, 'create', () => {
+        assert.equal(records.length, count + 1);
+        assert.equal(records.filter(record => record.clientName === client).length, 1);
+      });
+      const record = records.find(record => record.clientName === client);
+      await evaluate(`document.querySelector('[data-view=all]').click();document.querySelector('[data-open-record="${record.id}"]').click();document.querySelector('#detail-payment').click();document.querySelector('#payment-amount').value='1'`);
+      await submitRepeatedly('payment-form', width, 'payment', () => {
+        const updated = records.find(item => item.id === record.id);
+        assert.equal(updated.paymentRecords.length, 1);
+        assert.equal(updated.paymentRecords[0].amount, 1);
+        assert.equal(updated.version, 2);
+      });
+      await evaluate(`document.querySelector('[data-open-record="${record.id}"]').click();document.querySelector('#detail-follow-up').click();document.querySelector('#follow-result').value='重复保存验收，仅示例'`);
+      await submitRepeatedly('follow-form', width, 'follow-up', () => {
+        const updated = records.find(item => item.id === record.id);
+        assert.equal(updated.followUpRecords.length, 1);
+        assert.equal(updated.version, 3);
+      });
+    }
+    assert.deepEqual(errors, []);
+    break acceptance;
+  }
+  if (process.argv.includes('--network-acceptance')) {
+    await send('Network.enable');
+    const network = offline => send('Network.emulateNetworkConditions', {
+      offline, latency: 0, downloadThroughput: -1, uploadThroughput: -1,
+    });
+    for (const width of [1440, 390]) {
+      await send('Emulation.setDeviceMetricsOverride', { width, height: 1000, deviceScaleFactor: 1, mobile: width === 390 });
+      const before = JSON.stringify(records);
+      const count = records.length;
+      const amount = await evaluate("document.querySelector('#metric-outstanding').textContent");
+      await network(true);
+      await evaluate("document.querySelector('[data-refresh-records]').click()");
+      await wait("!document.querySelector('#sync-alert').hidden");
+      assert.equal(await evaluate("document.querySelector('#sync-status').textContent.includes('失败')"), true);
+      assert.equal(await evaluate("document.querySelector('#metric-outstanding').textContent"), amount);
+      await evaluate(`document.querySelector('[data-new-record]').click();document.querySelector('#client-name').value='断网验收${width}';document.querySelector('#project-name').value='仅隔离示例';document.querySelector('#total-amount').value='123.45';document.querySelector('#notes').value='恢复网络前不得创建';document.querySelector('#receivable-form').requestSubmit()`);
+      await wait("document.querySelector('#form-error').textContent.includes('网络连接失败') && document.querySelector('#receivable-form').dataset.busy !== 'true'");
+      assert.equal(JSON.stringify(records), before, 'Offline request must not mutate fixture server data');
+      assert.equal(await evaluate("!document.querySelector('#view-form').hidden && document.querySelector('#client-name').value"), `断网验收${width}`);
+      assert.equal(await evaluate("document.querySelector('#total-amount').value"), '123.45');
+      assert.equal(await evaluate("document.querySelector('#notes').value"), '恢复网络前不得创建');
+      assert.equal(await evaluate("document.querySelector('#receivable-form button[type=submit]').disabled"), false);
+      await screenshot(`network-offline-${width}.png`);
+      await network(false);
+      await evaluate("document.querySelector('#receivable-form').requestSubmit()");
+      await wait("!document.querySelector('#view-today').hidden");
+      assert.equal(records.length, count + 1, 'Retry should create exactly one fixture record');
+      assert.equal(records.filter(record => record.clientName === `断网验收${width}`).length, 1);
+      await evaluate("document.querySelector('[data-retry-sync]').click()");
+      await wait("document.querySelector('#sync-alert').hidden && document.querySelector('#sync-status').textContent.includes('已同步')");
+      await screenshot(`network-recovered-${width}.png`);
+      console.log(`NETWORK_ACCEPTANCE_PASS width=${width}: refresh error, old data retained, save failure, draft retained, controls unlocked, retry created once, sync recovered`);
+    }
+    assert.deepEqual(errors, []);
+    break acceptance;
+  }
   assert.equal(await evaluate('window.__radarHandleBack()'),false,'Idle today allows native exit');
   await evaluate("document.querySelector('[data-view=account]').click()");
   assert.equal(await evaluate('window.__radarHandleBack()'),true);
@@ -158,6 +302,7 @@ try {
   assert.deepEqual(errors,[]);
   console.log('UI_SMOKE_PASS: back navigation + unsaved confirmation + busy guard, desktop/mobile, search, empty state, correction, follow-up deferral, creation, VIP catalog, offline/retry, hover, reduced motion, logout failure, verification resend');
   console.log(`Screenshots: ${artifacts}`);
+  }
 } finally {
   socket?.close(); browser.kill();
   for(const request of pending.values()){clearTimeout(request.timer);request.reject(new Error('Test closed'));}
