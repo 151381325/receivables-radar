@@ -32,8 +32,8 @@ test('Android 正式版禁用系统备份并使用固定发布版本', async () 
   const gradle = await readProjectFile('android/app/build.gradle');
 
   assert.match(manifest, /android:allowBackup="false"/);
-  assert.match(gradle, /versionCode 2/);
-  assert.match(gradle, /versionName "1\.0\.1"/);
+  assert.match(gradle, /versionCode 3/);
+  assert.match(gradle, /versionName "1\.0\.2"/);
 });
 
 test('Android 签名材料不会进入 Git', async () => {
