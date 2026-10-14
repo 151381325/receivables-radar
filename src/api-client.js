@@ -7,13 +7,15 @@ export class ApiError extends Error {
   }
 }
 
-export function createApiClient(fetchImpl = globalThis.fetch, { onAuthRequired = () => {} } = {}) {
+export function createApiClient(fetchImpl = globalThis.fetch, { onAuthRequired = () => {}, getSessionGeneration = () => 0 } = {}) {
   async function request(path, options = {}) {
+    const generation = getSessionGeneration();
     let response;
     try {
       response = await fetchImpl(path, {
         ...options,
         credentials: 'same-origin',
+        cache: 'no-store',
         headers: {
           ...(options.body ? { 'content-type': 'application/json' } : {}),
           ...options.headers,
@@ -25,6 +27,9 @@ export function createApiClient(fetchImpl = globalThis.fetch, { onAuthRequired =
 
     const isJson = response.headers.get('content-type')?.includes('application/json');
     const body = isJson ? await response.json() : null;
+    if (generation !== getSessionGeneration()) {
+      throw new ApiError('账号状态已变化，已忽略旧会话响应', { code: 'SESSION_CHANGED' });
+    }
     if (!response.ok) {
       if (response.status === 401 && body?.error?.code === 'AUTH_REQUIRED') onAuthRequired();
       throw new ApiError(body?.error?.message ?? '请求失败，请稍后重试', {
@@ -48,6 +53,7 @@ export function createApiClient(fetchImpl = globalThis.fetch, { onAuthRequired =
     resendVerification: (email) => post('/api/auth/resend-verification', { email }),
     login: (input) => post('/api/auth/login', input),
     logout: () => post('/api/auth/logout'),
+    deleteAccount: input => remove('/api/account', input),
     requestPasswordReset: (email) => post('/api/auth/request-password-reset', { email }),
     resetPassword: (input) => post('/api/auth/reset-password', input),
     listReceivables: async () => (await request('/api/receivables')).records,

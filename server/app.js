@@ -7,6 +7,7 @@ import { createAdminRepository } from './admin/repository.js';
 import { createAuthenticate } from './plugins/authenticate.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { registerAuthRoutes } from './routes/auth.js';
+import { registerAccountRoutes } from './routes/account.js';
 import { registerReceivableRoutes } from './routes/receivables.js';
 import { FEATURE_CATALOG, getFreeEntitlements } from './entitlements.js';
 
@@ -18,6 +19,9 @@ export async function buildApp({ config, pool, mailer = null, clock = () => new 
   await app.register(cookie);
   await app.register(rateLimit, { global: false });
   app.decorateRequest('user', null);
+  app.addHook('onRequest', async (request, reply) => {
+    if (request.url.startsWith('/api/')) reply.header('Cache-Control', 'no-store');
+  });
 
   app.get('/api/health', async () => ({ status: 'ok' }));
 
@@ -29,6 +33,7 @@ export async function buildApp({ config, pool, mailer = null, clock = () => new 
   }));
 
   await registerReceivableRoutes(app, { pool, authenticate });
+  await registerAccountRoutes(app, { pool, config, authenticate });
   await registerAdminRoutes(app, {
     repository: createAdminRepository(pool),
     authenticate,

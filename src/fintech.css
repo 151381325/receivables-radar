@@ -180,3 +180,4 @@ a { color: var(--primary); }
   *, *::before, *::after { animation: none!important; transition: none!important; scroll-behavior: auto!important; }
   .metric-card:hover { transform: none; }
 }
+.button.danger { background: #b42332; color: #fff; border-color: #d44857; }

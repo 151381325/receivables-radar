@@ -13,21 +13,33 @@ const panels = [...document.querySelectorAll('[data-auth-panel]')];
 let resetToken = null;
 let appLoaded = false;
 let activeRepository = null;
+let sessionGeneration = 0;
+
+function clearAuthenticatedState(message) {
+  sessionGeneration++;
+  appLoaded = false;
+  activeRepository?.clear();
+  activeRepository = null;
+  document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
+  document.querySelectorAll('#today-list, #all-list, #detail-content, #recent-activity, #vip-catalog').forEach(element => element.replaceChildren());
+  document.querySelectorAll('form').forEach(form => form.reset());
+  document.querySelector('#reminder-text').value = '';
+  document.querySelectorAll('#metric-outstanding, #metric-received, #metric-overdue, #metric-upcoming').forEach(element => { element.textContent = '¥0.00'; });
+  document.querySelector('#metric-actions').textContent = '0 笔';
+  document.querySelector('#account-email').textContent = '';
+  document.querySelector('#admin-link').hidden = true;
+  appShell.hidden = true;
+  authShell.hidden = false;
+  showAuthView('login');
+  authError.textContent = message;
+  authError.focus();
+}
 
 const api = createApiClient(globalThis.fetch, {
+  getSessionGeneration: () => sessionGeneration,
   onAuthRequired: () => {
     if (appShell.hidden) return;
-    appLoaded = false;
-    activeRepository?.clear();
-    activeRepository = null;
-    document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
-    document.querySelectorAll('#today-list, #all-list, #detail-content, #recent-activity').forEach(element => element.replaceChildren());
-    appShell.hidden = true;
-    authShell.hidden = false;
-    document.querySelector('#account-email').textContent = '';
-    showAuthView('login');
-    authError.textContent = '登录已过期，请重新登录';
-    authError.focus();
+    clearAuthenticatedState('登录已过期，请重新登录');
   },
 });
 
@@ -51,9 +63,12 @@ function showAuthView(view, message = '') {
 }
 
 async function enterApp(user) {
+  sessionGeneration++;
   document.querySelector('#account-email').textContent = user.email;
   const adminLink = document.querySelector('#admin-link');
   adminLink.hidden = !user.isAdmin;
+  document.querySelector('#delete-account-button').disabled = Boolean(user.isAdmin);
+  document.querySelector('#delete-account-admin-hint').hidden = !user.isAdmin;
   if (!appLoaded) {
     const { startApp } = await import('./app.js');
     activeRepository = createCloudRepository(api);
@@ -140,6 +155,42 @@ document.querySelector('#resend-form').addEventListener('submit', event => {
   submit(event.currentTarget, async data => {
     const result = await api.resendVerification(data.get('email'));
     showAuthView('status', result.message);
+  });
+});
+
+const deleteDialog = document.querySelector('#delete-account-dialog');
+const deleteForm = document.querySelector('#delete-account-form');
+document.querySelector('#delete-account-button').addEventListener('click', () => {
+  deleteForm.reset();
+  document.querySelector('#delete-account-error').textContent = '';
+  deleteDialog.showModal();
+});
+deleteDialog.addEventListener('close', () => { deleteForm.reset(); document.querySelector('#delete-account-error').textContent = ''; });
+deleteDialog.addEventListener('cancel', event => { if (deleteForm.dataset.busy === 'true') event.preventDefault(); });
+deleteDialog.addEventListener('click', event => {
+  if (event.target === deleteDialog && deleteForm.dataset.busy === 'true') event.stopImmediatePropagation();
+}, true);
+deleteForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  const password = document.querySelector('#delete-account-password').value;
+  const confirmation = document.querySelector('#delete-account-confirmation').value;
+  const acknowledged = document.querySelector('#delete-account-acknowledged').checked;
+  const errorElement = document.querySelector('#delete-account-error');
+  if (!password || confirmation !== '注销' || !acknowledged) {
+    errorElement.textContent = '请输入当前密码、填写“注销”并确认删除后果';
+    errorElement.focus();
+    return;
+  }
+  await runWithFormBusy(deleteForm, async () => {
+    errorElement.textContent = '';
+    try {
+      await api.deleteAccount({ password, confirmation, acknowledged });
+      clearAuthenticatedState('账号已注销，在线数据已删除。所有设备的原登录均已失效。');
+    } catch (error) {
+      document.querySelector('#delete-account-password').value = '';
+      errorElement.textContent = error.code === 'NETWORK_ERROR' ? '暂时无法确认注销结果，请恢复网络后重新登录核实，或联系我们。' : error.message;
+      errorElement.focus();
+    }
   });
 });
 

@@ -3,6 +3,30 @@ import assert from 'node:assert/strict';
 
 import { createApiClient } from '../src/api-client.js';
 
+test('账号注销只提交当前账号校验信息，接受204无响应体', async () => {
+  let received;
+  const api = createApiClient(async (url, options) => { received = { url, options }; return new Response(null, { status: 204 }); });
+  await api.deleteAccount({ password: 'isolated input', confirmation: '注销', acknowledged: true });
+  assert.equal(received.url, '/api/account');
+  assert.equal(received.options.method, 'DELETE');
+  assert.deepEqual(JSON.parse(received.options.body), { password: 'isolated input', confirmation: '注销', acknowledged: true });
+});
+
+test('旧会话迟到的401不能触发新账号的认证失效回调', async () => {
+  let generation = 0;
+  let finish;
+  let authFailures = 0;
+  const api = createApiClient(() => new Promise(resolve => { finish = resolve; }), {
+    getSessionGeneration: () => generation,
+    onAuthRequired: () => { authFailures++; },
+  });
+  const oldRequest = api.listReceivables();
+  generation++;
+  finish(new Response(JSON.stringify({ error: { code: 'AUTH_REQUIRED', message: '请先登录' } }), { status: 401, headers: { 'content-type': 'application/json' } }));
+  await assert.rejects(oldRequest, error => error.code === 'SESSION_CHANGED');
+  assert.equal(authFailures, 0);
+});
+
 test('每个请求都使用同源 Cookie 并发送 JSON', async () => {
   const calls = [];
   const api = createApiClient(async (url, options) => {
@@ -15,6 +39,7 @@ test('每个请求都使用同源 Cookie 并发送 JSON', async () => {
   await api.login({ email: 'owner@example.com', password: 'password' });
   assert.equal(calls[0].url, '/api/auth/login');
   assert.equal(calls[0].options.credentials, 'same-origin');
+  assert.equal(calls[0].options.cache, 'no-store');
   assert.equal(calls[0].options.headers['content-type'], 'application/json');
 });
 

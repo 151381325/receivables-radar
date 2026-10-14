@@ -9,6 +9,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createReceivable, updateReceivable, addFollowUp, addPayment, removePayment } from '../src/domain.js';
 import { FEATURE_CATALOG, getFreeEntitlements } from '../server/entitlements.js';
+import { serializeBackup, validateImportRecords } from '../src/backup.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const siteRoot = process.argv.includes('--dist') ? join(root, 'dist') : root;
@@ -24,23 +25,66 @@ let records = [
 records[0] = { ...addPayment(records[0], { amount: 2000, paidAt: shift(-2), method: '银行转账' }), version: 1 };
 let offline = false;
 let authenticated = true;
+let currentUserEmail = 'demo@example.test';
+let adminUser = false;
+let deleteAccountCalls = 0;
+let deletionUnavailable = false;
+let latePaymentResponse = null;
+let paymentResponseHeld = false;
+let lateUnauthorizedResponse = null;
+let unauthorizedResponseHeld = false;
 const mutationRequests = [];
+const requestPaths = [];
 let mutationGate = null;
 const json = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
 const server = createServer(async (req, res) => {
   try {
     const path = new URL(req.url, 'http://localhost').pathname;
-    if (path === '/api/auth/me') return authenticated ? json(res,200,{ user:{ id:'smoke-user', email:'demo@example.test', isAdmin:false, emailVerified:true } }) : json(res,401,{error:{code:'AUTH_REQUIRED',message:'请先登录'}});
+    requestPaths.push(path);
+    if (path === '/api/auth/me') return authenticated ? json(res,200,{ user:{ id:'smoke-user', email:currentUserEmail, isAdmin:adminUser, emailVerified:true } }) : json(res,401,{error:{code:'AUTH_REQUIRED',message:'请先登录'}});
+    if (path === '/api/auth/login' && process.argv.includes('--account-deletion-acceptance')) {
+      for await (const chunk of req) { /* Consume the synthetic login body before responding. */ }
+      authenticated=true;currentUserEmail='new-session@example.test';
+      requestPaths.push('synthetic-login-body-consumed');
+      res.once('finish',()=>requestPaths.push('synthetic-login-response-finished'));
+      return json(res,200,{user:{id:'new-session-user',email:currentUserEmail,isAdmin:false,emailVerified:true}});
+    }
+    if (path === '/api/account' && req.method === 'DELETE') {
+      deleteAccountCalls++;
+      let body=''; for await (const chunk of req) body+=chunk;
+      const input=JSON.parse(body);
+      if (deletionUnavailable) return json(res,503,{error:{code:'UNAVAILABLE',message:'模拟服务不可用'}});
+      if (adminUser) return json(res,403,{error:{code:'ADMIN_DELETION_BLOCKED',message:'管理员不可自助注销'}});
+      if (input.password!=='isolated deletion input' || input.confirmation!=='注销' || input.acknowledged!==true) return json(res,403,{error:{code:'PASSWORD_INCORRECT',message:'当前密码不正确，未注销账号'}});
+      authenticated=false;records=[];res.writeHead(204);res.end();return;
+    }
     if (path === '/api/auth/logout') return json(res,503,{error:{message:'模拟退出失败'}});
     if (path === '/api/auth/resend-verification') return json(res,202,{message:'如果该邮箱尚未验证，验证邮件将发送。'});
     if (path === '/api/account/entitlements') return json(res,200,{ ...getFreeEntitlements(), catalog:FEATURE_CATALOG });
     if (path.startsWith('/api/receivables')) {
       if (offline) return json(res,503,{error:{code:'NETWORK_ERROR',message:'模拟同步失败'}});
-      if (req.method === 'GET') return json(res,200,{records});
+      if (req.method === 'GET') {
+        if (lateUnauthorizedResponse && !unauthorizedResponseHeld) {
+          unauthorizedResponseHeld=true;
+          await lateUnauthorizedResponse;
+          return json(res,401,{error:{code:'AUTH_REQUIRED',message:'旧会话失效'}});
+        }
+        return json(res,200,{records});
+      }
       let body = ''; for await (const chunk of req) body += chunk;
       const input = JSON.parse(body || '{}');
       mutationRequests.push({ method: req.method, path, version: input.version });
       if (mutationGate) await mutationGate;
+      if (path === '/api/receivables/import' && req.method === 'POST') {
+        const incoming = validateImportRecords(input.records);
+        let importedCount = 0;
+        for (const record of incoming) {
+          if (records.some(existing => existing.id === record.id)) continue;
+          records.push({ ...record, version: 1 });
+          importedCount += 1;
+        }
+        return json(res,200,{ records, importedCount, skippedCount: incoming.length - importedCount });
+      }
       if (path === '/api/receivables' && req.method === 'POST') {
         const record={...createReceivable(input),version:1}; records.push(record); return json(res,201,{record});
       }
@@ -54,7 +98,13 @@ const server = createServer(async (req, res) => {
       else if(parts[4]==='payments')updated=addPayment(old,input);
       else if(req.method==='PUT' && parts.length===4)updated=updateReceivable(old,input);
       else return json(res,404,{error:{message:'未实现的测试请求'}});
-      records[index]={...updated,version:old.version+1};return json(res,200,{record:records[index]});
+      records[index]={...updated,version:old.version+1};
+      const responseRecord=records[index];
+      if (parts[4]==='payments' && req.method==='DELETE' && latePaymentResponse) {
+        paymentResponseHeld=true;
+        await latePaymentResponse;
+      }
+      return json(res,200,{record:responseRecord});
     }
     if(path.startsWith('/api/'))return json(res,404,{error:{message:'未实现的测试请求'}});
     if(!['/','/index.html'].includes(path)&&!path.startsWith('/src/')&&!path.startsWith('/assets/')&&!path.startsWith('/privacy/')&&!path.startsWith('/terms/')){res.writeHead(404);res.end();return;}
@@ -96,6 +146,112 @@ try {
   assert.equal(await evaluate("document.querySelector('#today-list').children.length"),2);
   await screenshot('desktop.png');
   acceptance: {
+  if (process.argv.includes('--account-deletion-acceptance')) {
+    await evaluate("document.querySelector('[data-view=account]').click();document.querySelector('#delete-account-button').click()");
+    assert.equal(await evaluate("document.querySelector('#delete-account-dialog').open"), true);
+    await evaluate("document.querySelector('#delete-account-password').value='temporary';document.querySelector('#delete-account-dialog [data-close-dialog]').click()");
+    await wait("!document.querySelector('#delete-account-dialog').open && document.querySelector('#delete-account-password').value===''");
+    assert.equal(deleteAccountCalls, 0);
+    assert.equal(await evaluate("document.querySelector('#delete-account-password').value"), '');
+    await evaluate("document.querySelector('#delete-account-button').click();document.querySelector('#delete-account-form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}))");
+    await wait("document.querySelector('#delete-account-error').textContent.length>0");
+    assert.equal(deleteAccountCalls, 0);
+    await evaluate("document.querySelector('#delete-account-password').value='wrong';document.querySelector('#delete-account-confirmation').value='注销';document.querySelector('#delete-account-acknowledged').checked=true;document.querySelector('#delete-account-form').requestSubmit()");
+    await wait("document.querySelector('#delete-account-error').textContent.includes('密码不正确')");
+    assert.equal(authenticated, true);
+    assert.equal(records.length, 3);
+    deletionUnavailable=true;
+    await evaluate("document.querySelector('#delete-account-password').value='isolated deletion input';document.querySelector('#delete-account-form').requestSubmit()");
+    await wait("document.querySelector('#delete-account-error').textContent.includes('服务不可用') && document.querySelector('#delete-account-form').dataset.busy!=='true'");
+    assert.equal(authenticated, true);
+    deletionUnavailable=false;
+    // Admin entry is blocked, not merely hidden on the server.
+    await evaluate("document.querySelector('#delete-account-dialog').close()");
+    adminUser=true;
+    await send('Page.navigate',{url:origin});
+    await wait("!document.querySelector('#app-shell').hidden && !document.querySelector('#admin-link').hidden");
+    assert.equal(await evaluate("document.querySelector('#delete-account-button').disabled"), true);
+    adminUser=false;
+    await send('Page.navigate',{url:origin});
+    await wait("!document.querySelector('#app-shell').hidden && !document.querySelector('#delete-account-button').disabled");
+    // A previous payment correction committed but its HTTP response arrives after deletion.
+    let releasePayment;
+    latePaymentResponse=new Promise(resolve=>{releasePayment=resolve;});
+    await evaluate("document.querySelector('[data-view=all]').click();document.querySelector('[data-open-record=smoke-1]').click();document.querySelector('[data-remove-payment]').click()");
+    for(let attempt=0;attempt<30 && !paymentResponseHeld;attempt++) await pause(50);
+    assert.equal(paymentResponseHeld,true);
+    await evaluate("document.querySelector('#record-dialog [data-close-dialog]').click()");
+    let releaseUnauthorized;
+    lateUnauthorizedResponse=new Promise(resolve=>{releaseUnauthorized=resolve;});
+    await evaluate("document.querySelector('[data-refresh-records]').click()");
+    for(let attempt=0;attempt<30 && !unauthorizedResponseHeld;attempt++) await pause(50);
+    assert.equal(unauthorizedResponseHeld,true);
+    await send('Emulation.setDeviceMetricsOverride',{width:390,height:900,deviceScaleFactor:1,mobile:true});
+    await evaluate("document.querySelector('[data-view=account]').click();document.querySelector('#delete-account-button').click();document.querySelector('#delete-account-password').value='isolated deletion input';document.querySelector('#delete-account-confirmation').value='注销';document.querySelector('#delete-account-acknowledged').checked=true");
+    await screenshot('account-deletion-mobile.png');
+    const beforeCalls=deleteAccountCalls;
+    await evaluate("for(let i=0;i<10;i++)document.querySelector('#delete-account-form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}))");
+    await wait("document.querySelector('#app-shell').hidden && !document.querySelector('#auth-shell').hidden");
+    releasePayment();
+    latePaymentResponse=null;
+    await pause(250);
+    assert.equal(await evaluate("document.querySelectorAll('dialog[open]').length"),0,'Late business response must not reopen a private dialog after deletion');
+    assert.equal(deleteAccountCalls, beforeCalls+1);
+    assert.equal(records.length, 0);
+    assert.equal(await evaluate("document.querySelector('#delete-account-password').value"), '');
+    assert.equal(await evaluate("document.querySelector('#all-list').children.length"), 0);
+    assert.equal(await evaluate("document.querySelector('#account-email').textContent"), '');
+    assert.equal(await evaluate("document.querySelector('#auth-error').textContent.includes('已注销')"), true);
+    await evaluate("document.querySelector('#login-form [name=email]').value='new-session@example.test';document.querySelector('#login-form [name=password]').value='isolated new login';document.querySelector('#login-form').requestSubmit()");
+    try {
+      await wait("!document.querySelector('#app-shell').hidden && document.querySelector('#account-email').textContent==='new-session@example.test'");
+    } catch (error) {
+      console.log('NEW_SESSION_DIAGNOSTIC', await evaluate("({authError:document.querySelector('#auth-error').textContent,appHidden:document.querySelector('#app-shell').hidden,loginBusy:document.querySelector('#login-form').dataset.busy,accountAssigned:document.querySelector('#account-email').textContent})"), errors, requestPaths.slice(-12));
+      throw error;
+    }
+    releaseUnauthorized();
+    lateUnauthorizedResponse=null;
+    await pause(250);
+    assert.equal(await evaluate("!document.querySelector('#app-shell').hidden && document.querySelector('#account-email').textContent==='new-session@example.test'"),true,'Old unauthorized response cannot log out the new account');
+    assert.deepEqual(errors, []);
+    console.log('ACCOUNT_DELETION_UI_PASS: cancel, validation, wrong password, service failure, admin protection, repeat submit, clear session/data');
+    break acceptance;
+  }
+  if (process.argv.includes('--backup-acceptance')) {
+    const example = createReceivable({ clientName: '备份UI验收', projectName: '合成示例', totalAmount: 98.76, invoiceSent: true, dueDate: shift(10) });
+    const backupText = serializeBackup([example]);
+    const chooseFile = text => evaluate(`(()=>{const transfer=new DataTransfer();transfer.items.add(new File([${JSON.stringify(text)}],'acceptance.json',{type:'application/json'}));const input=document.querySelector('#backup-file');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    await evaluate("document.querySelector('[data-view=account]').click();window.__backupSaveCalls=[];window.Capacitor={isNativePlatform:()=>true,Plugins:{RadarFiles:{saveText:async input=>{window.__backupSaveCalls.push(input);const error=new Error('cancelled');error.code='SAVE_CANCELLED';throw error;}}}};");
+    const before = JSON.stringify(records);
+    const requestsBefore = mutationRequests.length;
+    await chooseFile(backupText);
+    await wait("document.querySelector('#toast').textContent.includes('未导入数据') && document.querySelector('#backup-file').value===''");
+    assert.equal(JSON.stringify(records), before);
+    assert.equal(mutationRequests.length, requestsBefore, 'Cancelling the pre-import backup must not call import API');
+    const captured = await evaluate('window.__backupSaveCalls');
+    assert.equal(captured.length, 1);
+    assert.deepEqual(JSON.parse(captured[0].content).records, records, 'Pre-import backup must include all existing records');
+    console.log('BACKUP_CANCEL_PASS: system-save cancellation stops import and retains data');
+    await evaluate('window.Capacitor.Plugins.RadarFiles.saveText=async input=>{window.__backupSaveCalls.push(input);return {saved:true};}');
+    await chooseFile(backupText);
+    await wait("document.querySelector('#toast').textContent.includes('导入 1 笔') && document.querySelector('#backup-file').value===''");
+    assert.equal(records.filter(record => record.id === example.id).length, 1);
+    const count = records.length;
+    await chooseFile(backupText);
+    await wait("document.querySelector('#toast').textContent.includes('跳过 1 笔') && document.querySelector('#backup-file').value===''");
+    assert.equal(records.length, count);
+    const requestsAfterRestore = mutationRequests.length;
+    await chooseFile('{invalid');
+    await wait("document.querySelector('#toast').textContent.includes('无法读取') && document.querySelector('#backup-file').value===''");
+    assert.equal(mutationRequests.length, requestsAfterRestore);
+    assert.equal(records.length, count);
+    await chooseFile(serializeBackup([]));
+    await wait("document.querySelector('#toast').textContent.includes('没有可导入') && document.querySelector('#backup-file').value===''");
+    assert.equal(mutationRequests.length, requestsAfterRestore);
+    assert.deepEqual(errors, []);
+    console.log('BACKUP_UI_ACCEPTANCE_PASS: restore once, duplicate skipped, malformed and empty files blocked, file input reset');
+    break acceptance;
+  }
   if (process.argv.includes('--sync-conflict-acceptance')) {
     // A fixture-side change represents another device; no production API is used.
     for (const width of [1440, 390]) {

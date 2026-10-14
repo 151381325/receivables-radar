@@ -151,6 +151,7 @@
             <section class="panel account-panel"><h2>账号与数据</h2><p class="account-email" id="account-email"></p><span class="status-pill">免费版 · 核心功能可用</span><p>支持应收记录、跟进、到账、搜索与数据备份。</p><div class="account-actions"><button class="button quiet" type="button" data-refresh-records>刷新数据</button><button class="button quiet" type="button" id="export-backup">导出备份</button><button class="button quiet" type="button" id="import-backup">导入备份</button></div><p class="hint">JSON 导入为合并新增，同 ID 的云端记录保留。云端同步不能替代独立备份。</p><input type="file" id="backup-file" accept="application/json,.json" hidden><button class="text-button" type="button" data-open-privacy>隐私与数据说明</button><div><button class="button quiet" type="button" id="logout-button">退出登录</button><p id="logout-error" role="alert"></p></div></section>
             <section class="panel account-panel"><h2>高级功能</h2><p>以下功能规划中，暂未开放购买。</p><div id="vip-catalog" class="vip-catalog"><p>正在加载功能规划…</p></div></section>
             <section class="panel account-panel"><h2>关于回款雷达</h2><p>催款文案仅生成与复制，由你确认后自行发送。</p><p><a href="./privacy/">隐私政策与账号注销联系渠道</a> · <a href="./terms/">用户协议</a></p><p>APP 备案：<a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">渝ICP备2026023184号-2A</a></p><p class="hint">APP 桌面图标与原签名保留。网站备案信息见页脚。</p></section>
+            <section class="panel account-panel"><h2>注销账号</h2><p>注销将删除在线账号及其应收、到账和跟进记录，并使所有设备的登录失效。此操作不可撤销，请先导出需要保留的备份。</p><button class="button danger" type="button" id="delete-account-button">注销账号</button><p class="hint" id="delete-account-admin-hint" hidden>管理员不支持自助注销，请通过隐私政策中的联系渠道处理。</p></section>
           </div>
         </section>
 
@@ -250,6 +251,19 @@
     <div class="modal-head"><div><p class="eyebrow">使用前请了解</p><h2>隐私与数据说明</h2></div><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div>
     <div class="privacy-content" id="privacy-content"></div>
     <div class="modal-actions"><button class="button primary" type="button" data-close-dialog>我知道了</button></div>
+  </dialog>
+
+  <dialog class="modal small-modal" id="delete-account-dialog" aria-labelledby="delete-account-title">
+    <form id="delete-account-form" novalidate>
+      <div class="modal-head"><h2 id="delete-account-title">注销账号</h2><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div>
+      <p>在线账号及其业务数据将永久删除，所有设备会退出登录。无法撤销，请先在“账号与数据”中导出备份。</p>
+      <p class="hint">历史备份不实时改写，你自行导出的文件也不会被删除。具体保留和清理情况可通过隐私政策中的联系渠道核实。</p>
+      <label class="field"><span>当前登录密码</span><input id="delete-account-password" type="password" autocomplete="current-password" maxlength="128" required></label>
+      <label class="field"><span>请输入“注销”确认</span><input id="delete-account-confirmation" autocomplete="off" maxlength="2" required></label>
+      <label class="check-field"><input id="delete-account-acknowledged" type="checkbox" required><span>我已备份或确认无需备份，理解注销不可撤销。</span></label>
+      <p class="form-error" id="delete-account-error" role="alert" tabindex="-1"></p>
+      <div class="modal-actions"><button class="button quiet" type="button" data-close-dialog>取消</button><button class="button danger" type="submit">永久注销</button></div>
+    </form>
   </dialog>
 
   <footer class="site-footer">
