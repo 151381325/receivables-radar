@@ -1,5 +1,6 @@
 import { createReceivableRepository } from '../receivables/repository.js';
 import { addFollowUp, addPayment, createReceivable, updateReceivable } from '../../src/domain.js';
+import { validateImportRecords } from '../../src/backup.js';
 
 export async function registerReceivableRoutes(app, { pool, authenticate }) {
   const repository = createReceivableRepository(pool);
@@ -42,13 +43,23 @@ export async function registerReceivableRoutes(app, { pool, authenticate }) {
     const followUp = updated.followUpRecords.at(-1);
     return repository.addFollowUp(request.user.id, record.id, request.body?.version, followUp);
   }));
+  app.delete('/api/receivables/:id/payments/:paymentId', { preHandler: authenticate }, async (request, reply) => {
+    try {
+      const record = await repository.removePayment(request.user.id, request.params.id, request.params.paymentId, request.body?.version);
+      if (!record) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: '到账记录不存在' } });
+      return reply.send({ record });
+    } catch (error) {
+      return reply.code(error.code === 'STALE_VERSION' ? 409 : 400).send({ error: { code: error.code ?? 'VALIDATION_ERROR', message: error.message } });
+    }
+  });
   app.delete('/api/receivables/:id', { preHandler: authenticate }, async (request, reply) => {
     try { return await repository.softDelete(request.user.id, request.params.id, request.body?.version) ? reply.code(204).send() : reply.code(404).send(); }
     catch (error) { return reply.code(409).send({ error: { code: error.code, message: error.message } }); }
   });
   app.post('/api/receivables/import', { preHandler: authenticate }, async (request, reply) => {
-    const records = request.body?.records;
-    if (!Array.isArray(records) || records.length > 500) return reply.code(400).send({ error: { code: 'VALIDATION_ERROR', message: '导入记录必须在1至500条之间' } });
+    let records;
+    try { records = validateImportRecords(request.body?.records); }
+    catch (error) { return reply.code(400).send({ error: { code: 'VALIDATION_ERROR', message: error.message } }); }
     return reply.send(await repository.importRecords(request.user.id, records));
   });
 }

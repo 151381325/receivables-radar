@@ -25,6 +25,31 @@ export async function registerAuthRoutes(app, { config, pool, mailer, clock }) {
   const accounts = createAccountRepository(pool);
   const sessions = createSessionService(pool, config);
 
+  app.post('/api/auth/resend-verification', {
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+  }, async (request, reply) => {
+    const email = typeof request.body?.email === 'string' ? request.body.email.trim() : '';
+    if (!EMAIL_PATTERN.test(email) || email.length > 254) return validationError(reply, '请输入有效邮箱');
+    const user = await accounts.findUserByEmail(email);
+    if (user && !user.emailVerifiedAt && !user.disabledAt) {
+      const recent = await pool.query(
+        "SELECT id FROM email_tokens WHERE user_id=$1 AND purpose='verify_email' AND created_at>$2 LIMIT 1",
+        [user.id, new Date(clock().getTime() - 60 * 1000)],
+      );
+      if (!recent.rows.length) {
+        const token = randomBytes(32).toString('base64url');
+        const tokenHash = hashOpaqueToken(token);
+        await accounts.createEmailToken({ userId: user.id, purpose: 'verify_email', tokenHash, expiresAt: new Date(clock().getTime() + TOKEN_LIFETIME_MS) });
+        try { await mailer.sendVerification({ email: user.email, token }); }
+        catch (error) {
+          await pool.query('DELETE FROM email_tokens WHERE token_hash=$1', [tokenHash]);
+          request.log.error({ err: error, requestId: request.id }, 'verification resend failed');
+        }
+      }
+    }
+    return reply.code(202).send({ message: '如果该邮箱尚未完成验证，验证邮件将发送；请检查收件箱与垃圾邮件，重发间隔至少60秒。' });
+  });
+
   app.post('/api/auth/register', {
     config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
   }, async (request, reply) => {

@@ -14,6 +14,38 @@ import {
 
 const NOW = '2026-09-01T08:00:00.000Z';
 
+test('已跟进逾期款按未来安排退出今日待办但仍计入风险', () => {
+  const record = addFollowUp(makeRecord({ dueDate: '2026-09-01' }), {
+    followedAt: '2026-09-12', result: '已确认，三天后再联系', nextFollowUpDate: '2026-09-15',
+  }, '2026-09-12T08:00:00.000Z');
+  assert.equal(deriveReceivable(record, '2026-09-12').needsActionToday, false);
+  assert.equal(deriveReceivable(record, '2026-09-13').needsActionToday, false);
+  assert.equal(deriveReceivable(record, '2026-09-15').needsActionToday, true);
+  assert.equal(calculateDashboard([record], '2026-09-12').overdueAmount, 5000);
+});
+
+test('新的承诺违约会重新进入今日待办', () => {
+  const record = addFollowUp(makeRecord({ dueDate: '2026-09-01' }), {
+    followedAt: '2026-09-12', result: '明天付款', promiseDate: '2026-09-13', nextFollowUpDate: '2026-09-17',
+  }, '2026-09-12T08:00:00.000Z');
+  assert.equal(deriveReceivable(record, '2026-09-12').needsActionToday, false);
+  assert.equal(deriveReceivable(record, '2026-09-14').needsActionToday, true);
+});
+
+test('承诺日期支持明确撤销，未修改则保留', () => {
+  const promised = addFollowUp(makeRecord(), { followedAt: '2026-09-02', result: '承诺', promiseDate: '2026-09-05' }, NOW);
+  const kept = addFollowUp(promised, { followedAt: '2026-09-04', result: '其他沟通' }, NOW);
+  assert.equal(deriveReceivable(kept, '2026-09-06').latestPromiseDate, '2026-09-05');
+  const cleared = addFollowUp(kept, { followedAt: '2026-09-06', result: '撤销原承诺', promiseAction: 'clear' }, NOW);
+  assert.equal(deriveReceivable(cleared, '2026-09-07').latestPromiseDate, null);
+  assert.equal(deriveReceivable(cleared, '2026-09-07').promiseOverdue, false);
+});
+
+test('业务金额拒绝超过两位小数，而不是静默四舍五入', () => {
+  assert.throws(() => makeRecord({ totalAmount: '12.345' }), /两位小数/);
+  assert.throws(() => addPayment(makeRecord(), { amount: '1.234', paidAt: '2026-09-01' }), /两位小数/);
+});
+
 function makeRecord(overrides = {}) {
   return createReceivable({
     clientName: '青禾设计',

@@ -46,6 +46,15 @@ test('状态筛选支持全部和指定状态', () => {
   assert.deepEqual(filterRecords(records, 'paid').map((item) => item.id), ['r2']);
 });
 
+test('需要行动的条目有跟进入口，其他条目只提供详情', () => {
+  const actionable = buildRecordCardHTML({ ...record, needsActionToday: true });
+  assert.match(actionable, /data-follow-record="r1"/);
+  assert.match(actionable, /去跟进/);
+  const future = buildRecordCardHTML({ ...record, needsActionToday: false });
+  assert.doesNotMatch(future, /data-follow-record/);
+  assert.match(future, /查看详情/);
+});
+
 test('隐私说明准确告知云端同步、用途、备份和敏感信息边界', () => {
   const html = buildPrivacyNoticeHTML();
 

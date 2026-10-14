@@ -17,7 +17,7 @@ function mapReceivable(row, payments = [], followUps = []) {
     paused: row.paused, notes: row.notes, version: row.version,
     createdAt: row.created_at.toISOString(), updatedAt: row.updated_at.toISOString(),
     paymentRecords: payments.map((item) => ({ id: item.id, amount: fenToYuan(Number(item.amount_fen)), paidAt: item.paid_at.toISOString().slice(0, 10), method: item.method, notes: item.notes })),
-    followUpRecords: followUps.map((item) => ({ id: item.id, followedAt: item.followed_at.toISOString().slice(0, 10), result: item.result, promiseDate: item.promise_date?.toISOString().slice(0, 10) ?? null, nextFollowUpDate: item.next_follow_up_date?.toISOString().slice(0, 10) ?? null })),
+    followUpRecords: followUps.map((item) => ({ id: item.id, followedAt: item.followed_at.toISOString().slice(0, 10), result: item.result, promiseDate: item.promise_date?.toISOString().slice(0, 10) ?? null, promiseAction: item.promise_action ?? (item.promise_date ? 'set' : 'keep'), nextFollowUpDate: item.next_follow_up_date?.toISOString().slice(0, 10) ?? null })),
   };
 }
 
@@ -25,14 +25,14 @@ async function hydrate(client, userId, row) {
   if (!row) return null;
   const [payments, followUps] = await Promise.all([
     client.query('SELECT * FROM payments WHERE user_id = $1 AND receivable_id = $2 ORDER BY created_at', [userId, row.id]),
-    client.query('SELECT * FROM follow_ups WHERE user_id = $1 AND receivable_id = $2 ORDER BY created_at', [userId, row.id]),
+    client.query('SELECT * FROM follow_ups WHERE user_id = $1 AND receivable_id = $2 ORDER BY created_at, recorded_order', [userId, row.id]),
   ]);
   return mapReceivable(row, payments.rows, followUps.rows);
 }
 
 export function createReceivableRepository(pool) {
   async function current(client, userId, id) {
-    const result = await client.query('SELECT * FROM receivables WHERE user_id = $1 AND id = $2 AND deleted_at IS NULL', [userId, id]);
+    const result = await client.query('SELECT * FROM receivables WHERE user_id = $1 AND id = $2 AND deleted_at IS NULL FOR UPDATE', [userId, id]);
     return result.rows[0] ?? null;
   }
   async function listWithClient(client, userId) {
@@ -84,7 +84,7 @@ export function createReceivableRepository(pool) {
         const existing = await current(client, userId, id);
         if (!existing) return null;
         if (existing.version !== version) throw staleVersionError();
-        await client.query('INSERT INTO follow_ups (id,receivable_id,user_id,followed_at,result,promise_date,next_follow_up_date) VALUES ($1,$2,$3,$4,$5,$6,$7)', [followUp.id, id, userId, followUp.followedAt, followUp.result, followUp.promiseDate, followUp.nextFollowUpDate]);
+        await client.query('INSERT INTO follow_ups (id,receivable_id,user_id,followed_at,result,promise_date,next_follow_up_date,promise_action) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [followUp.id, id, userId, followUp.followedAt, followUp.result, followUp.promiseDate, followUp.nextFollowUpDate, followUp.promiseAction ?? (followUp.promiseDate ? 'set' : 'keep')]);
         const updated = await client.query('UPDATE receivables SET next_follow_up_date=$3,version=version+1,updated_at=now() WHERE user_id=$1 AND id=$2 RETURNING *', [userId, id, followUp.nextFollowUpDate]);
         return hydrate(client, userId, updated.rows[0]);
       });
@@ -94,8 +94,9 @@ export function createReceivableRepository(pool) {
         const existing = await current(client, userId, id);
         if (!existing) return null;
         if (existing.version !== version) throw staleVersionError();
-        const removed = await client.query('DELETE FROM payments WHERE user_id=$1 AND receivable_id=$2 AND id=$3 RETURNING id', [userId, id, paymentId]);
+        const removed = await client.query('DELETE FROM payments WHERE user_id=$1 AND receivable_id=$2 AND id=$3 RETURNING *', [userId, id, paymentId]);
         if (!removed.rows[0]) return null;
+        await client.query('INSERT INTO payment_correction_events (user_id,receivable_id,payment_id,original_payment) VALUES ($1,$2,$3,$4::jsonb)', [userId, id, paymentId, JSON.stringify(removed.rows[0])]);
         const updated = await client.query('UPDATE receivables SET version=version+1,updated_at=now() WHERE user_id=$1 AND id=$2 RETURNING *', [userId, id]);
         return hydrate(client, userId, updated.rows[0]);
       });
@@ -122,7 +123,7 @@ export function createReceivableRepository(pool) {
             await client.query('INSERT INTO payments (id,receivable_id,user_id,amount_fen,paid_at,method,notes) VALUES ($1,$2,$3,$4,$5,$6,$7)', [payment.id, record.id, userId, yuanToFen(payment.amount), payment.paidAt, payment.method, payment.notes ?? '']);
           }
           for (const followUp of record.followUpRecords ?? []) {
-            await client.query('INSERT INTO follow_ups (id,receivable_id,user_id,followed_at,result,promise_date,next_follow_up_date) VALUES ($1,$2,$3,$4,$5,$6,$7)', [followUp.id, record.id, userId, followUp.followedAt, followUp.result, followUp.promiseDate ?? null, followUp.nextFollowUpDate ?? null]);
+            await client.query('INSERT INTO follow_ups (id,receivable_id,user_id,followed_at,result,promise_date,next_follow_up_date,promise_action) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [followUp.id, record.id, userId, followUp.followedAt, followUp.result, followUp.promiseDate ?? null, followUp.nextFollowUpDate ?? null, followUp.promiseAction ?? (followUp.promiseDate ? 'set' : 'keep')]);
           }
           importedCount += 1;
         }

@@ -11,6 +11,8 @@ function nextDate(dateText) {
 function escapeIcs(value) {
   return String(value)
     .replaceAll('\\', '\\\\')
+    .replaceAll('\r\n', '\n')
+    .replaceAll('\r', '\n')
     .replaceAll('\n', '\\n')
     .replaceAll(',', '\\,')
     .replaceAll(';', '\\;');
@@ -33,10 +35,16 @@ export function buildCalendarEvent(record, eventType = 'followUp') {
     'CALSCALE:GREGORIAN',
     'BEGIN:VEVENT',
     `UID:${escapeIcs(uid)}`,
+    `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}`,
     `DTSTART;VALUE=DATE:${compactDate(date)}`,
     `DTEND;VALUE=DATE:${compactDate(nextDate(date))}`,
     `SUMMARY:${escapeIcs(summary)}`,
     `DESCRIPTION:${escapeIcs(description)}`,
+    'BEGIN:VALARM',
+    'ACTION:DISPLAY',
+    `TRIGGER;VALUE=DATE-TIME:${compactDate(date)}T010000Z`,
+    `DESCRIPTION:${escapeIcs(summary)}`,
+    'END:VALARM',
     'END:VEVENT',
     'END:VCALENDAR',
     '',

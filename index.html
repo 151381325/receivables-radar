@@ -6,6 +6,7 @@
   <meta name="description" content="回款雷达：面向自由职业者的小型应收款跟进工具">
   <title>回款雷达</title>
   <link rel="stylesheet" href="./src/styles.css">
+  <link rel="stylesheet" href="./src/fintech.css">
 </head>
 <body>
   <section class="auth-shell" id="auth-shell" aria-labelledby="auth-title">
@@ -23,6 +24,7 @@
         <label class="field"><span>密码</span><input name="password" type="password" autocomplete="current-password" minlength="10" maxlength="128" required placeholder="请输入密码"></label>
         <button class="button primary auth-submit" type="submit">登录</button>
         <div class="auth-links"><button type="button" class="text-button" data-auth-view="forgot">忘记密码</button><button type="button" class="text-button" data-auth-view="register">创建账号</button></div>
+        <button type="button" class="text-button" data-auth-view="resend">未收到验证邮件？重新发送</button>
       </form>
 
       <form class="auth-form" id="register-form" data-auth-panel="register" hidden>
@@ -46,9 +48,16 @@
         <button class="button primary auth-submit" type="submit">保存新密码</button>
       </form>
 
+      <form class="auth-form" id="resend-form" data-auth-panel="resend" hidden>
+        <label class="field"><span>注册邮箱</span><input name="email" type="email" autocomplete="email" maxlength="254" required placeholder="name@example.com"></label>
+        <button class="button primary auth-submit" type="submit">重发验证邮件</button>
+        <button type="button" class="text-button auth-back" data-auth-view="login">返回登录</button>
+      </form>
+
       <div class="auth-form auth-status" data-auth-panel="status" hidden>
         <div class="auth-status-icon" aria-hidden="true">✓</div>
         <p id="auth-status-message"></p>
+        <button type="button" class="text-button" data-auth-view="resend">验证链接过期？重新发送</button>
         <button type="button" class="button primary" data-auth-view="login">返回登录</button>
       </div>
 
@@ -63,7 +72,7 @@
         <span class="brand-mark" aria-hidden="true"><span></span></span>
         <span><strong>回款雷达</strong><small>把该收的钱，稳稳收回来</small></span>
       </button>
-      <div class="header-controls"><span class="sync-status" id="sync-status" role="status">正在同步数据…</span><button class="text-button" type="button" data-refresh-records>刷新数据</button><button class="text-button" type="button" data-retry-sync hidden>重试同步</button><a class="text-button admin-link" id="admin-link" href="./admin/" hidden>用户管理</a><span class="account-email" id="account-email"></span><button class="text-button" id="logout-button" type="button">退出</button><button class="button primary header-action" type="button" data-new-record>＋ 新建应收</button></div>
+      <div class="header-controls"><span class="sync-status" id="sync-status" role="status">正在同步数据…</span><button class="text-button" type="button" data-refresh-records>刷新数据</button><button class="text-button" type="button" data-retry-sync hidden>重试同步</button><a class="text-button admin-link" id="admin-link" href="./admin/" hidden>用户管理</a><button class="text-button account-link" type="button" data-view="account">我的账号</button><button class="button primary header-action" type="button" data-new-record>＋ 新增应收</button></div>
     </header>
 
     <div class="workspace">
@@ -72,7 +81,7 @@
           <p class="nav-label">工作台</p>
           <button class="nav-item is-active" type="button" data-view="today"><span aria-hidden="true">⌁</span>今日行动</button>
           <button class="nav-item" type="button" data-view="all"><span aria-hidden="true">▦</span>全部应收</button>
-          <button class="nav-item" type="button" data-new-record><span aria-hidden="true">＋</span>新建应收</button>
+          <button class="nav-item" type="button" data-view="account"><span aria-hidden="true">○</span>我的账号</button>
         </div>
         <div class="privacy-note">
           <span class="privacy-icon" aria-hidden="true">⌾</span>
@@ -81,21 +90,20 @@
       </aside>
 
       <main class="main-content">
+        <div class="sync-alert" id="sync-alert" role="status" hidden><span>同步失败，当前显示的是此前加载的记录。</span><button class="text-button" type="button" data-retry-sync>重试同步</button></div>
         <section class="view" id="view-today" data-view-panel="today">
           <div class="page-heading">
             <div>
               <p class="eyebrow" id="today-date"></p>
-              <h1>今天，先处理这些款</h1>
-              <p>按紧急程度排好了，处理一笔就轻松一点。</p>
+              <h1>掌握回款的下一步。</h1>
+              <p id="today-subtitle">正在加载你的回款记录。</p>
             </div>
-            <button class="button primary desktop-only" type="button" data-new-record>＋ 新建应收</button>
+            <button class="button primary" type="button" data-new-record>＋ 新增应收</button>
           </div>
 
-          <div class="metrics" aria-label="回款概览">
-            <article class="metric-card emphasis"><span>待收总额</span><strong id="metric-outstanding">¥0.00</strong><small>包含暂停跟进</small></article>
-            <article class="metric-card danger"><span>已逾期金额</span><strong id="metric-overdue">¥0.00</strong><small>需要优先</small></article>
-            <article class="metric-card"><span>今日要跟进</span><strong id="metric-actions">0 笔</strong><small>今天只处理最关键的几笔</small></article>
-            <article class="metric-card"><span>7 天内到期</span><strong id="metric-upcoming">¥0.00</strong><small>提前安排更从容</small></article>
+          <div class="overview" aria-label="回款概览">
+            <article class="metric-card hero-card"><div class="radar-decoration" aria-hidden="true"><i></i><i></i><i></i></div><span>待收总额 / OUTSTANDING</span><strong id="metric-outstanding">¥0.00</strong><small id="outstanding-note">包含暂停跟进</small><div class="hero-stats"><div><span>累计已收</span><strong id="metric-received">¥0.00</strong></div><div><span>7 天内到期</span><strong id="metric-upcoming">¥0.00</strong></div><div><span>今日跟进</span><strong id="metric-actions">0 笔</strong></div></div></article>
+            <article class="metric-card risk-card"><span>逾期风险 / 需关注</span><strong id="metric-overdue">¥0.00</strong><small id="risk-note">暂无逾期款项</small><button class="text-button" type="button" id="risk-filter">查看逾期款项 ↗</button></article>
           </div>
 
           <div class="content-grid">
@@ -108,18 +116,10 @@
             </section>
 
             <aside class="right-column">
-              <section class="panel focus-card">
-                <p class="eyebrow">今天的回款进度</p>
-                <h2>先完成最关键的 1—3 笔</h2>
-                <p>不用一次清空所有事项。处理一笔，就离回款更近一步。</p>
-                <button class="text-button" type="button" data-view="all">查看全部应收 <span>→</span></button>
-              </section>
-              <section class="panel data-card">
-                <div><span class="data-icon" aria-hidden="true">⇩</span><div><strong>导出数据备份</strong><p>建议每周导出一次 JSON</p></div></div>
-                <button class="button quiet" type="button" id="export-backup">导出备份</button>
-                <button class="text-button small" type="button" id="import-backup">恢复备份</button>
-                <button class="privacy-link data-privacy-link" type="button" data-open-privacy>查看隐私与数据说明</button>
-                <input type="file" id="backup-file" accept="application/json,.json" hidden>
+              <section class="panel activity-panel">
+                <div class="panel-heading"><h2>回款动态</h2><span class="count-badge">最近记录</span></div>
+                <div id="recent-activity" class="recent-activity"></div>
+                <button class="text-button activity-all" type="button" data-view="all">查看全部应收 →</button>
               </section>
             </aside>
           </div>
@@ -128,9 +128,10 @@
         <section class="view" id="view-all" data-view-panel="all" hidden>
           <div class="page-heading">
             <div><p class="eyebrow">应收台账</p><h1>全部应收</h1><p>每一笔金额、状态和时间线，都在这里。</p></div>
-            <button class="button primary desktop-only" type="button" data-new-record>＋ 新建应收</button>
+            <button class="button primary" type="button" data-new-record>＋ 新增应收</button>
           </div>
           <section class="panel ledger-panel">
+            <div class="ledger-controls"><label class="field"><span>搜索客户或项目</span><input id="record-search" type="search" maxlength="100" placeholder="输入客户或项目名称"></label><label class="field"><span>风险筛选</span><select id="risk-select"><option value="all">全部风险状态</option><option value="overdue">已逾期</option><option value="upcoming">7 天内到期</option></select></label><label class="field"><span>排序</span><select id="record-sort"><option value="date-asc">到期日从早到晚</option><option value="date-desc">到期日从晚到早</option><option value="amount-desc">金额从高到低</option><option value="amount-asc">金额从低到高</option><option value="priority">跟进优先级</option></select></label></div>
             <div class="filter-row" role="group" aria-label="按状态筛选">
               <button class="filter-chip is-active" type="button" data-filter="all">全部</button>
               <button class="filter-chip" type="button" data-filter="unbilled">待开票</button>
@@ -140,7 +141,17 @@
               <button class="filter-chip" type="button" data-filter="paused">暂停</button>
             </div>
             <div class="record-list ledger-list" id="all-list"></div>
+            <div class="ledger-total" id="ledger-total"></div>
           </section>
+        </section>
+
+        <section class="view" id="view-account" data-view-panel="account" hidden>
+          <div class="page-heading"><div><p class="eyebrow">ACCOUNT</p><h1>我的账号</h1><p>管理同步、备份与产品信息。</p></div></div>
+          <div class="account-grid">
+            <section class="panel account-panel"><h2>账号与数据</h2><p class="account-email" id="account-email"></p><span class="status-pill">免费版 · 核心功能可用</span><p>支持应收记录、跟进、到账、搜索与数据备份。</p><div class="account-actions"><button class="button quiet" type="button" data-refresh-records>刷新数据</button><button class="button quiet" type="button" id="export-backup">导出备份</button><button class="button quiet" type="button" id="import-backup">导入备份</button></div><p class="hint">JSON 导入为合并新增，同 ID 的云端记录保留。云端同步不能替代独立备份。</p><input type="file" id="backup-file" accept="application/json,.json" hidden><button class="text-button" type="button" data-open-privacy>隐私与数据说明</button><div><button class="button quiet" type="button" id="logout-button">退出登录</button><p id="logout-error" role="alert"></p></div></section>
+            <section class="panel account-panel"><h2>高级功能</h2><p>以下功能规划中，暂未开放购买。</p><div id="vip-catalog" class="vip-catalog"><p>正在加载功能规划…</p></div></section>
+            <section class="panel account-panel"><h2>关于回款雷达</h2><p>催款文案仅生成与复制，由你确认后自行发送。</p><p><a href="./privacy/">隐私政策与账号注销联系渠道</a> · <a href="./terms/">用户协议</a></p><p>APP 备案：<a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">渝ICP备2026023184号-2A</a></p><p class="hint">APP 桌面图标与原签名保留。网站备案信息见页脚。</p></section>
+          </div>
         </section>
 
         <section class="view" id="view-form" data-view-panel="form" hidden>
@@ -188,8 +199,8 @@
 
     <nav class="mobile-nav" aria-label="移动端导航">
       <button class="is-active" type="button" data-view="today"><span>⌁</span>今日</button>
-      <button type="button" data-view="all"><span>▦</span>全部</button>
-      <button class="mobile-add" type="button" data-new-record><span>＋</span>新建</button>
+      <button type="button" data-view="all"><span>▦</span>应收</button>
+      <button type="button" data-view="account"><span>○</span>我的</button>
     </nav>
   </div>
 
@@ -221,6 +232,7 @@
     <form id="follow-form">
       <label class="field"><span>跟进日期 *</span><input id="follow-date" type="date" required></label>
       <label class="field"><span>跟进结果 *</span><textarea id="follow-result" maxlength="300" rows="3" required placeholder="例如：已联系客户，对方财务正在审批"></textarea></label>
+      <label class="field"><span>客户付款承诺</span><select id="promise-action"><option value="keep">保留原承诺 / 未新增承诺</option><option value="set">设置新的承诺日期</option><option value="clear">撤销原承诺</option></select></label>
       <div class="field-grid"><label class="field"><span>客户承诺付款日</span><input id="promise-date" type="date"></label><label class="field"><span>下次跟进日</span><input id="follow-next-date" type="date"></label></div>
       <p class="form-error" id="follow-error" role="alert"></p>
       <div class="modal-actions"><button class="button quiet" type="button" data-close-dialog>取消</button><button class="button primary" type="submit">保存记录</button></div>
@@ -230,7 +242,7 @@
   <dialog class="modal small-modal" id="reminder-dialog">
     <div class="modal-head"><div><p class="eyebrow">复制后自行发送</p><h2>催款文案</h2></div><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div>
     <label class="field"><span id="reminder-stage">建议文案</span><textarea id="reminder-text" rows="8"></textarea></label>
-    <div class="calendar-actions"><button class="text-button" type="button" id="export-follow-calendar">导出跟进提醒</button><button class="text-button" type="button" id="export-due-calendar">导出到期提醒</button></div>
+    <div class="calendar-actions"><button class="text-button" type="button" id="export-follow-calendar">导出跟进提醒</button><button class="text-button" type="button" id="export-due-calendar">导出到期提醒</button><p class="hint">导入系统日历后，请检查提醒是否启用。文件包含北京时间当天上午9点的提醒设置。</p></div>
     <div class="modal-actions"><button class="button quiet" type="button" data-close-dialog>关闭</button><button class="button primary" type="button" id="copy-reminder">复制文案</button></div>
   </dialog>
 

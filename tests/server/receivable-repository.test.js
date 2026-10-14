@@ -79,4 +79,36 @@ describe('应收仓库 PostgreSQL 集成', { skip: !databaseUrl }, () => {
     assert.equal(repeat.importedCount, 0);
     assert.equal(repeat.skippedCount, 1);
   });
+
+  test('同版本并发登记到账只允许一次提交，余额不会超收', async () => {
+    await repository.create(owner.id, record);
+    const responses = await Promise.allSettled([
+      repository.addPayment(owner.id, record.id, 1, { id: 'concurrent-1', amount: 800, paidAt: '2026-09-14', method: '转账', notes: '' }),
+      repository.addPayment(owner.id, record.id, 1, { id: 'concurrent-2', amount: 800, paidAt: '2026-09-14', method: '转账', notes: '' }),
+    ]);
+    assert.equal(responses.filter(item => item.status === 'fulfilled').length, 1);
+    assert.equal(responses.find(item => item.status === 'rejected').reason.code, 'STALE_VERSION');
+    const stored = (await repository.list(owner.id))[0];
+    assert.equal(stored.paymentRecords.reduce((sum, payment) => sum + payment.amount, 0), 800);
+    assert.equal(stored.version, 2);
+  });
+
+  test('到账纠错保留原始事件且其他账号无法查看', async () => {
+    await repository.create(owner.id, record);
+    await repository.addPayment(owner.id, record.id, 1, { id: 'wrong-1', amount: 100, paidAt: '2026-09-14', method: '转账', notes: '误录' });
+    assert.equal(await repository.removePayment(other.id, record.id, 'wrong-1', 2), null);
+    const corrected = await repository.removePayment(owner.id, record.id, 'wrong-1', 2);
+    assert.deepEqual(corrected.paymentRecords, []);
+    const audit = await pool.query('SELECT original_payment FROM payment_correction_events WHERE user_id=$1', [owner.id]);
+    assert.equal(audit.rows.length, 1);
+    assert.equal(Number(audit.rows[0].original_payment.amount_fen), 10000);
+  });
+
+  test('批量导入同一时间戳的承诺历史保留撤销顺序', async () => {
+    const imported = await repository.importRecords(owner.id, [{ ...record, followUpRecords: [
+      { id: 'promise-set', followedAt: '2026-09-01', result: '承诺付款', promiseDate: '2026-09-10', promiseAction: 'set' },
+      { id: 'promise-clear', followedAt: '2026-09-11', result: '撤销旧承诺', promiseDate: null, promiseAction: 'clear' },
+    ] }]);
+    assert.deepEqual(imported.records[0].followUpRecords.map(item => item.promiseAction), ['set', 'clear']);
+  });
 });

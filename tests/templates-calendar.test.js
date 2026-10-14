@@ -69,3 +69,11 @@ test('付款截止日日历使用截止日期并转义特殊字符', () => {
   assert.match(ics, /青禾\\,设计/);
   assert.match(ics, /官网\\;升级/);
 });
+
+test('日历导出包含北京时间上午九点提醒与生成时间，避免纯事件无通知', () => {
+  const ics = buildCalendarEvent(derivedRecord(), 'followUp');
+  assert.match(ics, /DTSTAMP:\d{8}T\d{6}Z/);
+  assert.match(ics, /BEGIN:VALARM\r\nACTION:DISPLAY/);
+  assert.match(ics, /TRIGGER;VALUE=DATE-TIME:20260914T010000Z/);
+  assert.match(ics, /END:VALARM/);
+});

@@ -4,6 +4,16 @@ function roundMoney(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
 
+function requireMoney(value, label) {
+  const text = String(value ?? '').trim();
+  if (/^\d+\.\d{3,}$/.test(text)) throw new Error('金额最多两位小数');
+  const amount = Number(text);
+  if (!/^\d+(?:\.\d{1,2})?$/.test(text) || !Number.isSafeInteger(Math.round(amount * 100)) || amount <= 0) {
+    throw new Error(`${label}必须大于0且为有效金额`);
+  }
+  return roundMoney(amount);
+}
+
 function requireText(value, label, maxLength) {
   const text = String(value ?? '').trim();
   if (!text) throw new Error(`${label}不能为空`);
@@ -41,7 +51,7 @@ function newId(prefix) {
 }
 
 export function createReceivable(input, now = new Date().toISOString()) {
-  const totalAmount = roundMoney(input.totalAmount);
+  const totalAmount = requireMoney(input.totalAmount, '应收总额');
   if (!Number.isFinite(totalAmount) || totalAmount <= 0) throw new Error('应收总额必须大于0');
 
   return {
@@ -74,9 +84,12 @@ export function deriveReceivable(record, today) {
   const rawOverdueDays = daysBetween(record.dueDate, today);
   const isOverdue = active && rawOverdueDays > 0;
   const overdueDays = isOverdue ? rawOverdueDays : 0;
-  const latestPromiseDate = [...(record.followUpRecords ?? [])]
-    .reverse()
-    .find((item) => item.promiseDate)?.promiseDate ?? null;
+  const followUps = record.followUpRecords ?? [];
+  let latestPromiseDate = null;
+  for (const item of followUps) {
+    if (item.promiseAction === 'clear') latestPromiseDate = null;
+    else if (item.promiseDate) latestPromiseDate = item.promiseDate;
+  }
   const promiseOverdue = active && latestPromiseDate && daysBetween(latestPromiseDate, today) > 0;
   const followUpDue = active && record.nextFollowUpDate && daysBetween(record.nextFollowUpDate, today) >= 0;
   const dueDistance = daysBetween(today, record.dueDate);
@@ -91,7 +104,13 @@ export function deriveReceivable(record, today) {
   else if (active && status === 'unbilled' && !record.nextFollowUpDate) [actionPriority, actionReason] = [5, '待发送付款通知'];
   else if (active) [actionPriority, actionReason] = [6, '持续跟进'];
 
-  const needsActionToday = active && (Boolean(promiseOverdue) || isOverdue || Boolean(followUpDue) || dueDistance === 0 || (status === 'unbilled' && !record.nextFollowUpDate));
+  const lastFollowUp = followUps.at(-1);
+  const handledToday = lastFollowUp?.followedAt === today;
+  const newlyOverdue = lastFollowUp && record.dueDate >= lastFollowUp.followedAt && isOverdue;
+  const newBrokenPromise = lastFollowUp && latestPromiseDate >= lastFollowUp.followedAt && promiseOverdue;
+  const deferred = lastFollowUp && lastFollowUp.followedAt <= today && record.nextFollowUpDate > today
+    && !newlyOverdue && !newBrokenPromise;
+  const needsActionToday = active && !handledToday && !deferred && (Boolean(promiseOverdue) || isOverdue || Boolean(followUpDue) || dueDistance === 0 || (status === 'unbilled' && !record.nextFollowUpDate));
 
   return {
     ...record,
@@ -109,7 +128,7 @@ export function deriveReceivable(record, today) {
 }
 
 export function addPayment(record, payment, now = new Date().toISOString()) {
-  const amount = roundMoney(payment.amount);
+  const amount = requireMoney(payment.amount, '到账金额');
   if (!Number.isFinite(amount) || amount <= 0) throw new Error('到账金额必须大于0');
   const remaining = deriveReceivable(record, now.slice(0, 10)).remainingAmount;
   if (amount > remaining) throw new Error('到账金额不能超过剩余金额');
@@ -138,6 +157,9 @@ export function removePayment(record, paymentId, now = new Date().toISOString())
 
 export function addFollowUp(record, followUp, now = new Date().toISOString()) {
   const nextFollowUpDate = optionalDate(followUp.nextFollowUpDate, '下次跟进日期');
+  const promiseAction = followUp.promiseAction ?? (followUp.promiseDate ? 'set' : 'keep');
+  if (!['keep', 'set', 'clear'].includes(promiseAction)) throw new Error('承诺更新方式无效');
+  const promiseDate = promiseAction === 'set' ? requireDate(followUp.promiseDate, '承诺付款日期') : null;
   return {
     ...record,
     nextFollowUpDate,
@@ -147,7 +169,8 @@ export function addFollowUp(record, followUp, now = new Date().toISOString()) {
         id: newId('follow'),
         followedAt: requireDate(followUp.followedAt, '跟进日期'),
         result: requireText(followUp.result, '跟进结果', 300),
-        promiseDate: optionalDate(followUp.promiseDate, '承诺付款日期'),
+        promiseDate,
+        promiseAction,
         nextFollowUpDate,
       },
     ],

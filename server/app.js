@@ -8,6 +8,7 @@ import { createAuthenticate } from './plugins/authenticate.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerReceivableRoutes } from './routes/receivables.js';
+import { FEATURE_CATALOG, getFreeEntitlements } from './entitlements.js';
 
 export async function buildApp({ config, pool, mailer = null, clock = () => new Date() }) {
   const app = Fastify({ logger: config.nodeEnv !== 'test' });
@@ -22,6 +23,9 @@ export async function buildApp({ config, pool, mailer = null, clock = () => new 
 
   app.get('/api/auth/me', { preHandler: authenticate }, async (request) => ({
     user: request.user,
+  }));
+  app.get('/api/account/entitlements', { preHandler: authenticate }, async () => ({
+    ...getFreeEntitlements(), catalog: FEATURE_CATALOG,
   }));
 
   await registerReceivableRoutes(app, { pool, authenticate });

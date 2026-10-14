@@ -6,16 +6,23 @@ import {
   buildPrivacyNoticeHTML,
   buildRecordCardHTML,
   escapeHtml,
-  filterRecords,
   formatMoney,
   statusLabel,
 } from './presentation.js';
 import { buildReminderMessage } from './templates.js';
+import { queryReceivables } from './receivable-query.js';
+import { initializeCardEffects } from './card-effects.js';
+import { createRefreshCoordinator } from './refresh-coordinator.js';
+import { saveTextFile } from './file-export.js';
 
 let repository;
 const viewPanels = [...document.querySelectorAll('[data-view-panel]')];
 const state = { currentView: 'today', currentFilter: 'all', activeId: null };
 let toastTimer;
+const coordinateRefresh = createRefreshCoordinator();
+let lastRefreshAt = 0;
+let lastRenderedDate = '';
+let mutationCount = 0;
 
 function localDate(date = new Date()) {
   const year = date.getFullYear();
@@ -41,38 +48,50 @@ function showToast(message) {
 function setSyncStatus(message, canRetry = false) {
   const status = document.querySelector('#sync-status');
   status.textContent = message;
-  document.querySelector('[data-retry-sync]').hidden = !canRetry;
+  document.querySelector('.header-controls [data-retry-sync]').hidden = !canRetry;
+  document.querySelector('#sync-alert').hidden = !canRetry;
+  status.classList.toggle('sync-failed', canRetry);
 }
 
 async function refreshRecords({ silent = false } = {}) {
   if (!repository) return;
-  setSyncStatus('正在同步数据…');
-  try {
-    await repository.load();
+  const currentRepository = repository;
+  return coordinateRefresh(currentRepository, async () => { try {
+    setSyncStatus('正在同步数据…');
+    await currentRepository.load();
+    if (repository !== currentRepository) return;
     render();
+    lastRefreshAt = Date.now();
     setSyncStatus(`数据已同步 · ${new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date())}`);
     if (!silent) showToast('已刷新云端数据');
   } catch (error) {
+    if (repository !== currentRepository) return;
     setSyncStatus('同步失败，可重试', true);
     if (!silent) showToast(error.message);
     throw error;
-  }
+  } });
 }
 
 async function handleMutation(action) {
+  mutationCount += 1;
   try {
     return await action();
   } catch (error) {
     if (error.code === 'STALE_VERSION') {
-      await refreshRecords({ silent: true }).catch(() => {});
-      showToast('这笔记录已在其他设备更新，已刷新最新数据');
+      try { await refreshRecords({ silent: true }); showToast('这笔记录已在其他设备更新，请核对最新数据'); }
+      catch { showToast('记录已在其他设备更新，当前刷新失败，请联网后重试'); }
     }
     throw error;
-  }
+  } finally { mutationCount -= 1; }
 }
 
-function emptyState(message = '还没有符合条件的应收款') {
-  return `<div class="empty-state"><div class="empty-icon">✓</div><h3>${escapeHtml(message)}</h3><p>新建一笔应收，回款节奏就会自动排好。</p><button class="button primary" type="button" data-new-record>新建第一笔应收</button></div>`;
+function emptyState(kind) {
+  const copy = kind === 'new'
+    ? ['还没有应收款项', '记录客户、金额和到期日，开始管理回款。', '新增第一笔应收', 'data-new-record']
+    : kind === 'today'
+      ? ['今天没有待跟进款项', '已有安排会保留，逾期风险仍可在概览查看。', '查看全部应收', 'data-view="all"']
+      : ['没有匹配的应收款', '试试其他关键词、付款状态或风险筛选。', '清除筛选', 'data-clear-filters'];
+  return `<div class="empty-state"><div class="empty-icon">✓</div><h3>${copy[0]}</h3><p>${copy[1]}</p><button class="button quiet" type="button" ${copy[3]}>${copy[2]}</button></div>`;
 }
 
 function renderToday(records, today) {
@@ -81,12 +100,26 @@ function renderToday(records, today) {
   document.querySelector('#metric-overdue').textContent = formatMoney(metrics.overdueAmount);
   document.querySelector('#metric-actions').textContent = `${metrics.actionCount} 笔`;
   document.querySelector('#metric-upcoming').textContent = formatMoney(metrics.dueWithinSevenDaysAmount);
+  const derived = records.map(record => deriveReceivable(record, today));
+  const active = derived.filter(record => record.remainingAmount > 0);
+  const overdue = derived.filter(record => record.isOverdue);
+  document.querySelector('#metric-received').textContent = formatMoney(derived.reduce((sum, record) => sum + record.receivedAmount, 0));
+  document.querySelector('#outstanding-note').textContent = `${active.length} 笔待收 · 含暂停跟进款项`;
+  document.querySelector('#today-subtitle').textContent = metrics.actionCount ? `今天有 ${metrics.actionCount} 笔待跟进；共有 ${overdue.length} 笔逾期款项。` : '今天没有待跟进款项，后续安排已保留。';
+  document.querySelector('#risk-note').textContent = overdue.length ? `${overdue.length} 笔已逾期，风险仍需关注。` : '暂无逾期款项，按计划跟进即可。';
+  document.querySelector('.risk-card').classList.toggle('no-risk', !overdue.length);
 
   const queue = getTodayQueue(records, today);
   document.querySelector('#queue-count').textContent = `${queue.length} 笔`;
   document.querySelector('#today-list').innerHTML = queue.length
     ? queue.map(buildRecordCardHTML).join('')
-    : emptyState('今天没有需要处理的款项');
+    : emptyState(records.length ? 'today' : 'new');
+  const events = records.flatMap(record => [
+    { id: record.id, client: record.clientName, date: record.createdAt.slice(0, 10), type: '新增应收', text: record.projectName },
+    ...record.paymentRecords.map(item => ({ id: record.id, client: record.clientName, date: item.paidAt, type: '登记到账', text: formatMoney(item.amount) })),
+    ...record.followUpRecords.map(item => ({ id: record.id, client: record.clientName, date: item.followedAt, type: '记录跟进', text: item.result })),
+  ]).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+  document.querySelector('#recent-activity').innerHTML = events.length ? events.map(item => `<button type="button" class="activity-event" data-open-record="${escapeHtml(item.id)}"><span>${escapeHtml(item.date)} · ${item.type}</span><strong>${escapeHtml(item.client)}</strong><small>${escapeHtml(item.text)}</small></button>`).join('') : '<p class="activity-empty">还没有动态。新增应收或记录跟进后会显示在这里。</p>';
 }
 
 function renderAll(records, today) {
@@ -97,20 +130,23 @@ function renderAll(records, today) {
       const closedB = ['paid', 'paused'].includes(b.status) ? 1 : 0;
       return closedA - closedB || a.dueDate.localeCompare(b.dueDate);
     });
-  const filtered = filterRecords(derived, state.currentFilter);
+  const filtered = queryReceivables(derived, { status: state.currentFilter, query: document.querySelector('#record-search').value, risk: document.querySelector('#risk-select').value, sort: document.querySelector('#record-sort').value, today });
   document.querySelector('#all-list').innerHTML = filtered.length
     ? filtered.map(buildRecordCardHTML).join('')
-    : emptyState('这个状态下暂时没有记录');
+    : emptyState(records.length ? 'filter' : 'new');
+  document.querySelector('#ledger-total').textContent = `当前列表 ${filtered.length} 笔 · 待收合计 ${formatMoney(filtered.reduce((sum, record) => sum + record.remainingAmount, 0))}`;
 }
 
 function render() {
   const records = repository.list();
   const today = localDate();
+  lastRenderedDate = today;
   document.querySelector('#today-date').textContent = new Intl.DateTimeFormat('zh-CN', {
     month: 'long', day: 'numeric', weekday: 'long',
   }).format(new Date(`${today}T12:00:00`));
   renderToday(records, today);
   renderAll(records, today);
+  initializeCardEffects();
 }
 
 function showView(view) {
@@ -151,15 +187,16 @@ function timelineHtml(record) {
     date: item.paidAt,
     type: '到账',
     text: `${formatMoney(item.amount)} · ${item.method}${item.notes ? ` · ${item.notes}` : ''}`,
+    paymentId: item.id,
   }));
   const followUps = (record.followUpRecords ?? []).map((item) => ({
     date: item.followedAt,
     type: '跟进',
-    text: `${item.result}${item.promiseDate ? ` · 承诺 ${item.promiseDate} 付款` : ''}`,
+    text: `${item.result}${item.promiseDate ? ` · 承诺 ${item.promiseDate} 付款` : item.promiseAction === 'clear' ? ' · 已撤销原承诺' : ''}`,
   }));
   const items = [...payments, ...followUps].sort((a, b) => b.date.localeCompare(a.date));
   if (!items.length) return '<p class="project-name">还没有到账或跟进记录。</p>';
-  return items.map((item) => `<div class="timeline-item"><span>${escapeHtml(item.date)} · ${item.type}</span><p>${escapeHtml(item.text)}</p></div>`).join('');
+  return items.map((item) => `<div class="timeline-item"><span>${escapeHtml(item.date)} · ${item.type}</span><p>${escapeHtml(item.text)}</p>${item.paymentId ? `<button type="button" class="text-button correction-button" data-remove-payment="${escapeHtml(item.paymentId)}">纠正误录到账</button>` : ''}</div>`).join('');
 }
 
 function openDetail(id) {
@@ -194,14 +231,8 @@ function activeRecord() {
   return state.activeId ? repository.get(state.activeId) : null;
 }
 
-function downloadText(filename, content, mimeType) {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
+function showExportResult(result) {
+  showToast(result.status === 'saved' ? '文件已保存' : result.status === 'cancelled' ? '已取消保存' : '已发起下载，请确认文件已保存');
 }
 
 document.addEventListener('click', (event) => {
@@ -209,6 +240,23 @@ document.addEventListener('click', (event) => {
   if (viewButton) showView(viewButton.dataset.view);
 
   if (event.target.closest('[data-new-record]')) openForm();
+  const correction = event.target.closest('[data-remove-payment]');
+  if (correction) {
+    const record = activeRecord();
+    if (record && !correction.disabled && window.confirm('确认撤销这条误录到账吗？剩余待收金额会重新计算。')) {
+      correction.disabled = true;
+      handleMutation(() => repository.removePayment(record.id, correction.dataset.removePayment, record.version)).then(() => {
+        closeDialogs(); render(); openDetail(record.id); showToast('误录到账已撤销，余额已更新');
+      }).catch(error => { showToast(error.message); correction.disabled = false; });
+    }
+  }
+  if (event.target.closest('[data-clear-filters]')) {
+    state.currentFilter = 'all';
+    document.querySelector('#record-search').value = '';
+    document.querySelector('#risk-select').value = 'all';
+    document.querySelectorAll('[data-filter]').forEach(button => button.classList.toggle('is-active', button.dataset.filter === 'all'));
+    renderAll(repository.list(), localDate());
+  }
 
   if (event.target.closest('[data-refresh-records], [data-retry-sync]')) {
     refreshRecords().catch(() => {});
@@ -221,6 +269,8 @@ document.addEventListener('click', (event) => {
 
   const recordButton = event.target.closest('[data-open-record]');
   if (recordButton) openDetail(recordButton.dataset.openRecord);
+  const followButton = event.target.closest('[data-follow-record]');
+  if (followButton) { openDetail(followButton.dataset.followRecord); document.querySelector('#detail-follow-up').click(); }
 
   const closeButton = event.target.closest('[data-close-dialog]');
   if (closeButton) closeButton.closest('dialog')?.close();
@@ -340,6 +390,7 @@ document.querySelector('#follow-form').addEventListener('submit', async (event) 
         followedAt: document.querySelector('#follow-date').value,
         result: document.querySelector('#follow-result').value,
         promiseDate: document.querySelector('#promise-date').value || null,
+        promiseAction: document.querySelector('#promise-action').value,
         nextFollowUpDate: document.querySelector('#follow-next-date').value || null,
       }));
       closeDialogs();
@@ -373,13 +424,12 @@ document.querySelector('#copy-reminder').addEventListener('click', async () => {
   showToast('催款文案已复制');
 });
 
-function exportCalendar(eventType) {
+async function exportCalendar(eventType) {
   const record = activeRecord();
   if (!record) return;
   try {
     const derived = deriveReceivable(record, localDate());
-    downloadText(`回款提醒-${record.clientName}-${eventType}.ics`, buildCalendarEvent(derived, eventType), 'text/calendar;charset=utf-8');
-    showToast('日历提醒已导出');
+    showExportResult(await saveTextFile(`回款提醒-${record.clientName}-${eventType}.ics`, buildCalendarEvent(derived, eventType), 'text/calendar;charset=utf-8'));
   } catch (error) {
     showToast(error.message);
   }
@@ -388,9 +438,13 @@ function exportCalendar(eventType) {
 document.querySelector('#export-follow-calendar').addEventListener('click', () => exportCalendar('followUp'));
 document.querySelector('#export-due-calendar').addEventListener('click', () => exportCalendar('due'));
 
-document.querySelector('#export-backup').addEventListener('click', () => {
-  downloadText(`回款雷达备份-${localDate()}.json`, serializeBackup(repository.list()), 'application/json;charset=utf-8');
-  showToast('完整备份已导出');
+document.querySelector('#export-backup').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  try {
+    showExportResult(await saveTextFile(`回款雷达备份-${localDate()}.json`, serializeBackup(repository.list()), 'application/json;charset=utf-8'));
+  } catch (error) { showToast(error.message); }
+  finally { button.disabled = false; }
 });
 
 document.querySelector('#import-backup').addEventListener('click', () => document.querySelector('#backup-file').click());
@@ -400,8 +454,11 @@ document.querySelector('#backup-file').addEventListener('change', async (event) 
   try {
     const source = await file.text();
     const parsed = parseBackup(source, []);
+    if (!parsed.records.length) { showToast('这个备份没有可导入的记录'); return; }
     if (!window.confirm(`将导入 ${parsed.records.length} 笔本地记录到云端；同 ID 的云端记录会保留。导入前会下载原始备份，是否继续？`)) return;
-    downloadText(`回款雷达导入前备份-${localDate()}.json`, source, 'application/json;charset=utf-8');
+    const backupResult = await saveTextFile(`回款雷达导入前备份-${localDate()}.json`, serializeBackup(repository.list()), 'application/json;charset=utf-8');
+    if (backupResult.status === 'cancelled') { showToast('已取消保存，未导入数据'); return; }
+    if (backupResult.status === 'started' && !window.confirm('请确认导入前备份已下载并保存，再继续导入。是否已保存？')) return;
     const result = await handleMutation(() => repository.importRecords(parsed.records));
     render();
     showToast(`恢复完成：导入 ${result.importedCount} 笔，跳过 ${result.skippedCount} 笔`);
@@ -420,6 +477,38 @@ document.querySelectorAll('dialog').forEach((dialog) => {
 
 export async function startApp(cloudRepository) {
   repository = cloudRepository;
+  state.activeId = null;
+  state.currentFilter = 'all';
+  document.querySelector('#record-search').value = '';
+  document.querySelector('#risk-select').value = 'all';
+  document.querySelector('#record-sort').value = 'date-asc';
+  document.querySelectorAll('[data-filter]').forEach(button => button.classList.toggle('is-active', button.dataset.filter === 'all'));
+  render();
   showView('today');
   await refreshRecords({ silent: true });
 }
+
+document.querySelector('#record-search').addEventListener('input', () => renderAll(repository.list(), localDate()));
+document.querySelectorAll('#risk-select, #record-sort').forEach(element => element.addEventListener('change', () => renderAll(repository.list(), localDate())));
+document.querySelector('#risk-filter').addEventListener('click', () => {
+  document.querySelector('#risk-select').value = 'overdue'; state.currentFilter = 'all';
+  document.querySelector('#record-search').value = '';
+  document.querySelectorAll('[data-filter]').forEach(button => button.classList.toggle('is-active', button.dataset.filter === 'all'));
+  renderAll(repository.list(), localDate()); showView('all');
+});
+function updatePromiseInput() {
+  const setting = document.querySelector('#promise-action').value === 'set';
+  document.querySelector('#promise-date').disabled = !setting;
+  document.querySelector('#promise-date').required = setting;
+}
+document.querySelector('#promise-action').addEventListener('change', updatePromiseInput);
+document.querySelector('#detail-follow-up').addEventListener('click', updatePromiseInput);
+function refreshOnReturn() {
+  if (!repository || document.querySelector('#app-shell').hidden || document.visibilityState === 'hidden' || mutationCount || document.querySelector('dialog[open]')) return;
+  if (lastRenderedDate !== localDate()) render();
+  if (Date.now() - lastRefreshAt > 15000) refreshRecords({ silent: true }).catch(() => {});
+}
+document.addEventListener('visibilitychange', refreshOnReturn);
+window.addEventListener('focus', refreshOnReturn);
+window.addEventListener('online', () => { lastRefreshAt = 0; refreshOnReturn(); });
+setInterval(refreshOnReturn, 60000);

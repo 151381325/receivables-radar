@@ -50,3 +50,18 @@ test('缺少必要字段的记录不会覆盖现有数据', () => {
   assert.throws(() => parseBackup(invalid, existing), /记录结构不完整/);
   assert.equal(existing.length, 1);
 });
+
+test('恢复拒绝不存在的日期和累计超过应收金额的子记录', () => {
+  const invalidDate = { ...record('date', '客户'), dueDate: '2026-02-30' };
+  assert.throws(() => parseBackup(serializeBackup([invalidDate])), /日期/);
+  const overpaid = { ...record('overpaid', '客户'), paymentRecords: [
+    { id: 'pay-1', amount: 2001, paidAt: '2026-09-01', method: '转账', notes: '' },
+  ] };
+  assert.throws(() => parseBackup(serializeBackup([overpaid])), /剩余金额/);
+});
+
+test('恢复拒绝重复子记录 ID 和非法金额', () => {
+  const payment = { id: 'pay-1', amount: 1, paidAt: '2026-09-01', method: '转账', notes: '' };
+  assert.throws(() => parseBackup(serializeBackup([{ ...record('r', '客户'), paymentRecords: [payment, payment] }])), /重复/);
+  assert.throws(() => parseBackup(serializeBackup([{ ...record('r', '客户'), totalAmount: '1.234' }])), /两位小数/);
+});

@@ -79,3 +79,13 @@ test('管理员客户端安全编码查询条件并更新账号状态', async ()
   assert.equal(calls[1].options.method, 'PATCH');
   assert.equal(calls[1].options.body, JSON.stringify({ disabled: true }));
 });
+
+test('导入记录中的特殊 ID 在全部修改接口中安全编码', async () => {
+  const paths = [];
+  const api = createApiClient(async (url) => { paths.push(url); return new Response(JSON.stringify({ record: { id: 'r/a#1' } }), { headers: { 'content-type': 'application/json' } }); });
+  await api.updateReceivable('r/a#1', {});
+  await api.addPayment('r/a#1', {});
+  await api.addFollowUp('r/a#1', {});
+  await api.deleteReceivable('r/a#1', 1);
+  assert.deepEqual(paths, ['/api/receivables/r%2Fa%231', '/api/receivables/r%2Fa%231/payments', '/api/receivables/r%2Fa%231/follow-ups', '/api/receivables/r%2Fa%231']);
+});

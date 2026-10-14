@@ -66,7 +66,8 @@ export function buildRecordCardHTML(record) {
         </span>
         <span class="project-name">${escapeHtml(record.projectName)}</span>
         <span class="card-amount">${formatMoney(record.remainingAmount)}</span>
-        <span class="card-meta">截止 ${escapeHtml(record.dueDate)} · ${escapeHtml(record.actionReason || '无需处理')}</span>
+        <span class="card-meta">截止 ${escapeHtml(record.dueDate)} · ${escapeHtml(record.actionReason || '无需处理')}${record.nextFollowUpDate ? ` · 下次跟进 ${escapeHtml(record.nextFollowUpDate)}` : ''}</span>
       </button>
+      <div class="record-actions"><button class="button quiet" type="button" ${record.needsActionToday ? `data-follow-record="${escapeHtml(record.id)}"` : `data-open-record="${escapeHtml(record.id)}"`}>${record.needsActionToday ? '去跟进 ↗' : '查看详情'}</button></div>
     </article>`;
 }

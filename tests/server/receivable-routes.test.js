@@ -47,6 +47,11 @@ function createReceivableRoutePool() {
         });
         return { rows: [] };
       }
+      if (text.startsWith('DELETE FROM payments')) {
+        const index = payments.findIndex(item => item.id === params[2]);
+        return { rows: index < 0 ? [] : payments.splice(index, 1) };
+      }
+      if (text.startsWith('INSERT INTO payment_correction_events')) return { rows: [] };
       if (text.startsWith('UPDATE receivables SET version=version+1')) {
         row.version += 1;
         row.updated_at = new Date('2026-09-26T01:00:00.000Z');
@@ -99,8 +104,39 @@ test('到账、跟进、删除和导入接口均要求登录', async () => {
   for (const [method, url] of [
     ['POST', '/api/receivables/rec-1/payments'], ['POST', '/api/receivables/rec-1/follow-ups'],
     ['DELETE', '/api/receivables/rec-1'], ['POST', '/api/receivables/import'],
+    ['DELETE', '/api/receivables/rec-1/payments/pay-1'],
   ]) assert.equal((await app.inject({ method, url, payload: {} })).statusCode, 401, `${method} ${url}`);
   await app.close();
+});
+
+test('到账纠错接口恢复余额并拒绝旧版本重复修改', async () => {
+  const app = Fastify();
+  app.decorateRequest('user', null);
+  await registerReceivableRoutes(app, { pool: createReceivableRoutePool(), authenticate: async request => { request.user = { id: 'user-1' }; } });
+  try {
+    const added = await app.inject({ method: 'POST', url: '/api/receivables/rec-1/payments', payload: { version: 1, amount: 100, paidAt: '2026-09-26', method: '转账' } });
+    const paymentId = added.json().record.paymentRecords[0].id;
+    const removed = await app.inject({ method: 'DELETE', url: `/api/receivables/rec-1/payments/${paymentId}`, payload: { version: 2 } });
+    assert.equal(removed.statusCode, 200);
+    assert.deepEqual(removed.json().record.paymentRecords, []);
+    assert.equal(removed.json().record.version, 3);
+    const stale = await app.inject({ method: 'DELETE', url: `/api/receivables/rec-1/payments/${paymentId}`, payload: { version: 2 } });
+    assert.equal(stale.statusCode, 409);
+  } finally { await app.close(); }
+});
+
+test('直接调用导入接口也拒绝非法日期、超额到账和空批次', async () => {
+  const app = Fastify();
+  app.decorateRequest('user', null);
+  await registerReceivableRoutes(app, { pool: createReceivableRoutePool(), authenticate: async request => { request.user = { id: 'user-1' }; } });
+  const base = { id: 'import-1', clientName: '客户', projectName: '项目', totalAmount: 100, invoiceSent: true, dueDate: '2026-09-30', paymentRecords: [], followUpRecords: [] };
+  try {
+    for (const records of [[], [{ ...base, dueDate: '2026-02-30' }], [{ ...base, paymentRecords: [{ id: 'p', amount: 101, paidAt: '2026-09-26', method: '转账' }] }]]) {
+      const result = await app.inject({ method: 'POST', url: '/api/receivables/import', payload: { records } });
+      assert.equal(result.statusCode, 400);
+      assert.equal(result.json().error.code, 'VALIDATION_ERROR');
+    }
+  } finally { await app.close(); }
 });
 
 test('到账接口接受整数金额并保存本次到账记录', async () => {
