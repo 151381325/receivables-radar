@@ -1,11 +1,8 @@
-import { cp, mkdir, rm } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { buildSite } from './site-build.mjs';
 
-const outputDirectory = new URL('../dist/', import.meta.url);
-
-await rm(outputDirectory, { recursive: true, force: true });
-await mkdir(outputDirectory, { recursive: true });
-await cp(new URL('../index.html', import.meta.url), new URL('index.html', outputDirectory));
-await cp(new URL('../src/', import.meta.url), new URL('src/', outputDirectory), { recursive: true });
-await cp(new URL('../terms/', import.meta.url), new URL('terms/', outputDirectory), { recursive: true });
-await cp(new URL('../privacy/', import.meta.url), new URL('privacy/', outputDirectory), { recursive: true });
-await cp(new URL('../admin/', import.meta.url), new URL('admin/', outputDirectory), { recursive: true });
+const result = await buildSite({
+  rootDirectory: fileURLToPath(new URL('../', import.meta.url)),
+  outputDirectory: fileURLToPath(new URL('../dist/', import.meta.url)),
+});
+console.log(`Built resource version: ${result.version}`);

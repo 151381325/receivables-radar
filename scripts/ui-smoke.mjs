@@ -11,6 +11,7 @@ import { createReceivable, addFollowUp, addPayment, removePayment } from '../src
 import { FEATURE_CATALOG, getFreeEntitlements } from '../server/entitlements.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
+const siteRoot = process.argv.includes('--dist') ? join(root, 'dist') : root;
 const artifacts = join(root, 'tmp', 'ui-smoke');
 await mkdir(artifacts, { recursive: true });
 const localToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -51,9 +52,9 @@ const server = createServer(async (req, res) => {
       records[index]={...updated,version:old.version+1};return json(res,200,{record:records[index]});
     }
     if(path.startsWith('/api/'))return json(res,404,{error:{message:'未实现的测试请求'}});
-    if(!['/','/index.html'].includes(path)&&!path.startsWith('/src/')&&!path.startsWith('/privacy/')&&!path.startsWith('/terms/')){res.writeHead(404);res.end();return;}
-    const file=resolve(root,'.'+decodeURIComponent(path==='/'?'/index.html':path));
-    if(!file.startsWith(root)){res.writeHead(403);res.end();return;}
+    if(!['/','/index.html'].includes(path)&&!path.startsWith('/src/')&&!path.startsWith('/assets/')&&!path.startsWith('/privacy/')&&!path.startsWith('/terms/')){res.writeHead(404);res.end();return;}
+    const file=resolve(siteRoot,'.'+decodeURIComponent(path==='/'?'/index.html':path));
+    if(!file.startsWith(resolve(siteRoot)+'\\')&&!file.startsWith(resolve(siteRoot)+'/')){res.writeHead(403);res.end();return;}
     let data=await readFile(file);
     if (serveOnly && extname(file) === '.html') data = Buffer.from(data.toString().replace('<body>', '<body><div style="position:sticky;top:0;z-index:9999;background:#facc15;color:#111;padding:8px;text-align:center">测试版 · 仅示例数据 · 不连接正式账号</div>'));
     res.writeHead(200,{'content-type':({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png'})[extname(file)]||'application/octet-stream'});res.end(data);
@@ -68,7 +69,7 @@ if (serveOnly) {
 }
 const profile=await mkdtemp(join(tmpdir(),'radar-ui-smoke-'));
 const browser=spawn(process.env.UI_TEST_BROWSER||'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',['--headless=new','--disable-gpu','--no-first-run','--remote-debugging-port=0',`--user-data-dir=${profile}`,'about:blank'],{windowsHide:true,stdio:'ignore'});
-let socket; let nextId=0; const pending=new Map(); const errors=[];
+let socket; let nextId=0; let acceptDialogs=true; const pending=new Map(); const errors=[];
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 function send(method,params={}){return new Promise((resolve,reject)=>{const id=++nextId;const timer=setTimeout(()=>{pending.delete(id);reject(new Error(`CDP timeout: ${method}`));},15000);pending.set(id,{resolve,reject,timer});socket.send(JSON.stringify({id,method,params}));});}
 async function evaluate(expression){const result=await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(result.exceptionDetails)throw new Error(result.exceptionDetails.text+':'+(result.exceptionDetails.exception?.description||''));return result.result.value;}
@@ -81,7 +82,7 @@ try {
   const targets=await(await fetch(`http://127.0.0.1:${port}/json/list`)).json();
   socket=new WebSocket(targets.find(t=>t.type==='page').webSocketDebuggerUrl);
   await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true});});
-  socket.addEventListener('message',event=>{const message=JSON.parse(event.data);if(message.id){const request=pending.get(message.id);if(request){clearTimeout(request.timer);pending.delete(message.id);message.error?request.reject(new Error(message.error.message)):request.resolve(message.result);}}else if(message.method==='Runtime.exceptionThrown'){errors.push(message.params.exceptionDetails.exception?.description||message.params.exceptionDetails.text);}else if(message.method==='Page.javascriptDialogOpening'){send('Page.handleJavaScriptDialog',{accept:true}).catch(()=>{});}});
+  socket.addEventListener('message',event=>{const message=JSON.parse(event.data);if(message.id){const request=pending.get(message.id);if(request){clearTimeout(request.timer);pending.delete(message.id);message.error?request.reject(new Error(message.error.message)):request.resolve(message.result);}}else if(message.method==='Runtime.exceptionThrown'){errors.push(message.params.exceptionDetails.exception?.description||message.params.exceptionDetails.text);}else if(message.method==='Page.javascriptDialogOpening'){send('Page.handleJavaScriptDialog',{accept:acceptDialogs}).catch(()=>{});}});
   await send('Runtime.enable');await send('Page.enable');
   await send('Emulation.setTimezoneOverride',{timezoneId:'Asia/Shanghai'});
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
@@ -89,6 +90,31 @@ try {
   assert.equal(await evaluate("document.querySelector('#metric-outstanding').textContent"),'¥28,600.00');
   assert.equal(await evaluate("document.querySelector('#today-list').children.length"),2);
   await screenshot('desktop.png');
+  assert.equal(await evaluate('window.__radarHandleBack()'),false,'Idle today allows native exit');
+  await evaluate("document.querySelector('[data-view=account]').click()");
+  assert.equal(await evaluate('window.__radarHandleBack()'),true);
+  assert.equal(await evaluate("!document.querySelector('[data-view-panel=today]').hidden"),true);
+  await evaluate("document.querySelector('[data-open-record=smoke-1]').click();document.querySelector('#detail-reminder').click()");
+  assert.equal(await evaluate('window.__radarHandleBack()'),true);
+  assert.equal(await evaluate("document.querySelector('#reminder-dialog').open"),false);
+  await evaluate("document.querySelector('[data-new-record]').click();document.querySelector('#client-name').value='未保存测试'");
+  acceptDialogs=false;
+  assert.equal(await evaluate('window.__radarHandleBack()'),true);
+  assert.equal(await evaluate("!document.querySelector('[data-view-panel=form]').hidden && document.querySelector('#client-name').value==='未保存测试'"),true);
+  acceptDialogs=true;
+  assert.equal(await evaluate('window.__radarHandleBack()'),true);
+  assert.equal(await evaluate("!document.querySelector('[data-view-panel=today]').hidden"),true);
+  await evaluate("document.querySelector('[data-open-record=smoke-1]').click();document.querySelector('#detail-payment').click();document.querySelector('#payment-amount').value='1'");
+  acceptDialogs=false;
+  assert.equal(await evaluate('window.__radarHandleBack()'),true);
+  assert.equal(await evaluate("document.querySelector('#payment-dialog').open && document.querySelector('#payment-amount').value==='1'"),true);
+  acceptDialogs=true;
+  assert.equal(await evaluate('window.__radarHandleBack()'),true);
+  assert.equal(await evaluate("document.querySelector('#payment-dialog').open"),false);
+  await evaluate("document.querySelector('[data-new-record]').click();document.querySelector('#receivable-form').dataset.busy='true'");
+  assert.equal(await evaluate('window.__radarHandleBack()'),true);
+  assert.equal(await evaluate("!document.querySelector('[data-view-panel=form]').hidden"),true);
+  await evaluate("document.querySelector('#receivable-form').dataset.busy='false';window.__radarHandleBack()");
   const point=await evaluate("(()=>{const r=document.querySelector('.hero-card').getBoundingClientRect();return{x:r.x+r.width*.7,y:r.y+r.height*.6}})()");
   await send('Input.dispatchMouseEvent',{type:'mouseMoved',...point});await pause(200);
   assert.ok(await evaluate("document.querySelector('.hero-card').style.getPropertyValue('--mx')"));
@@ -130,7 +156,7 @@ try {
   await send('Emulation.setDeviceMetricsOverride',{width:390,height:900,deviceScaleFactor:1,mobile:true});
   await screenshot('login-mobile.png');
   assert.deepEqual(errors,[]);
-  console.log('UI_SMOKE_PASS: desktop/mobile, search, empty state, correction, follow-up deferral, creation, VIP catalog, offline/retry, hover, reduced motion, logout failure, verification resend');
+  console.log('UI_SMOKE_PASS: back navigation + unsaved confirmation + busy guard, desktop/mobile, search, empty state, correction, follow-up deferral, creation, VIP catalog, offline/retry, hover, reduced motion, logout failure, verification resend');
   console.log(`Screenshots: ${artifacts}`);
 } finally {
   socket?.close(); browser.kill();

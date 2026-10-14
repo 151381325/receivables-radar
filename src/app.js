@@ -14,10 +14,42 @@ import { queryReceivables } from './receivable-query.js';
 import { initializeCardEffects } from './card-effects.js';
 import { createRefreshCoordinator } from './refresh-coordinator.js';
 import { saveTextFile } from './file-export.js';
+import { createBackHandler } from './back-navigation.js';
 
 let repository;
 const viewPanels = [...document.querySelectorAll('[data-view-panel]')];
 const state = { currentView: 'today', currentFilter: 'all', activeId: null };
+const inputBaselines = new WeakMap();
+let dialogSequence = 0;
+
+function inputSnapshot(container) {
+  return JSON.stringify([...container.querySelectorAll('input, select, textarea')].map(input => [input.id, input.value, input.checked ?? null]));
+}
+
+function hasUnsavedInputs(container) {
+  return inputBaselines.has(container) && inputBaselines.get(container) !== inputSnapshot(container);
+}
+
+function showDialog(dialog) {
+  inputBaselines.set(dialog, inputSnapshot(dialog));
+  dialog.dataset.openSequence = String(++dialogSequence);
+  dialog.showModal();
+}
+
+window.__radarHandleBack = createBackHandler({
+  getContext: () => ({
+    appVisible: !document.querySelector('#app-shell').hidden,
+    view: state.currentView,
+    dialogs: [...document.querySelectorAll('dialog[open]')]
+      .sort((a, b) => Number(a.dataset.openSequence || 0) - Number(b.dataset.openSequence || 0))
+      .map(dialog => ({ id: dialog.id, dirty: hasUnsavedInputs(dialog) })),
+    formDirty: hasUnsavedInputs(document.querySelector('#receivable-form')),
+    busy: mutationCount > 0 || [...document.querySelectorAll('form[data-busy="true"]')].some(form => form.closest('dialog[open]') || (state.currentView === 'form' && form.id === 'receivable-form')),
+  }),
+  confirmDiscard: () => window.confirm('当前内容尚未保存，确认放弃修改并返回？'),
+  closeDialog: id => document.getElementById(id).close(),
+  showToday: () => showView('today'),
+});
 let toastTimer;
 const coordinateRefresh = createRefreshCoordinator();
 let lastRefreshAt = 0;
@@ -178,6 +210,7 @@ function openForm(record = null) {
   } else {
     document.querySelector('#due-date').value = shiftDate(localDate(), 7);
   }
+  inputBaselines.set(form, inputSnapshot(form));
   showView('form');
   requestAnimationFrame(() => document.querySelector('#client-name').focus());
 }
@@ -220,7 +253,7 @@ function openDetail(id) {
     <div class="timeline"><h3>时间线</h3><div class="timeline-list">${timelineHtml(record)}</div></div>`;
   document.querySelector('#detail-payment').disabled = derived.status === 'paid';
   document.querySelector('#detail-follow-up').disabled = derived.status === 'paid';
-  document.querySelector('#record-dialog').showModal();
+  showDialog(document.querySelector('#record-dialog'));
 }
 
 function closeDialogs() {
@@ -264,7 +297,7 @@ document.addEventListener('click', (event) => {
 
   if (event.target.closest('[data-open-privacy]')) {
     document.querySelector('#privacy-content').innerHTML = buildPrivacyNoticeHTML();
-    document.querySelector('#privacy-dialog').showModal();
+    showDialog(document.querySelector('#privacy-dialog'));
   }
 
   const recordButton = event.target.closest('[data-open-record]');
@@ -343,7 +376,7 @@ document.querySelector('#detail-payment').addEventListener('click', () => {
   document.querySelector('#payment-amount').max = derived.remainingAmount;
   document.querySelector('#payment-amount').value = derived.remainingAmount;
   document.querySelector('#payment-date').value = localDate();
-  document.querySelector('#payment-dialog').showModal();
+  showDialog(document.querySelector('#payment-dialog'));
 });
 
 document.querySelector('#payment-form').addEventListener('submit', async (event) => {
@@ -376,7 +409,7 @@ document.querySelector('#detail-follow-up').addEventListener('click', () => {
   document.querySelector('#follow-error').textContent = '';
   document.querySelector('#follow-date').value = localDate();
   document.querySelector('#follow-next-date').value = record.nextFollowUpDate ?? '';
-  document.querySelector('#follow-dialog').showModal();
+  showDialog(document.querySelector('#follow-dialog'));
 });
 
 document.querySelector('#follow-form').addEventListener('submit', async (event) => {
@@ -410,7 +443,7 @@ document.querySelector('#detail-reminder').addEventListener('click', () => {
   document.querySelector('#reminder-stage').textContent = `建议阶段：${reminder.stage}`;
   document.querySelector('#reminder-text').value = reminder.text;
   document.querySelector('#export-follow-calendar').disabled = !record.nextFollowUpDate;
-  document.querySelector('#reminder-dialog').showModal();
+  showDialog(document.querySelector('#reminder-dialog'));
 });
 
 document.querySelector('#copy-reminder').addEventListener('click', async () => {

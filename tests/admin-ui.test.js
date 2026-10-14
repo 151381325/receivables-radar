@@ -32,7 +32,4 @@ test('主应用仅向管理员显示用户管理入口', async () => {
   assert.match(source, /adminLink\.hidden = !user\.isAdmin/);
 });
 
-test('构建脚本发布管理页面', async () => {
-  const source = await readProjectFile('scripts/build.mjs');
-  assert.match(source, /\.\.\/admin\//);
-});
+// Built admin-page availability is exercised by site-build.test.js, not source-text matching.

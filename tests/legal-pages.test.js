@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 
@@ -65,8 +67,10 @@ test('隐私政策页面说明云端处理、用户权利和账号注销渠道',
 });
 
 test('构建脚本会发布用户协议和隐私政策页面', async () => {
-  const source = await readProjectFile('scripts/build.mjs');
-
-  assert.match(source, /terms/);
-  assert.match(source, /privacy/);
+  await promisify(execFile)(process.execPath, ['scripts/build.mjs'], { cwd: new URL('../', import.meta.url) });
+  const terms = await readProjectFile('dist/terms/index.html');
+  const privacy = await readProjectFile('dist/privacy/index.html');
+  assert.match(terms, /<title>[^<]*用户协议/);
+  assert.match(privacy, /<title>[^<]*隐私政策/);
+  for (const html of [terms, privacy]) assert.match(html, /href="\/assets\/[a-f0-9]{16}\/src\/legal\.css"/);
 });
